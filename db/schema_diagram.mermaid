@@ -1,0 +1,154 @@
+erDiagram
+    USERS ||--o{ CLUB_MEMBERS : "состоит в"
+    CLUBS ||--o{ CLUB_MEMBERS : "содержит"
+    CLUBS ||--o{ SESSIONS : "проводит"
+    USERS ||--o{ SESSIONS : "host создаёт"
+
+    SESSIONS ||--o{ TABLES : "включает"
+    SESSIONS ||--o{ SESSION_PARTICIPANTS : "участники"
+    CLUB_MEMBERS ||--o{ SESSION_PARTICIPANTS : "играет в"
+
+    TABLES ||--o{ BUY_IN_EVENTS : "регистрирует"
+    TABLES ||--o{ CASH_OUT_EVENTS : "регистрирует"
+    SESSION_PARTICIPANTS ||--o{ BUY_IN_EVENTS : "совершает"
+    SESSION_PARTICIPANTS ||--o{ CASH_OUT_EVENTS : "совершает"
+
+    SESSIONS ||--o{ SESSION_RESULTS : "итоги"
+    SESSION_PARTICIPANTS ||--|| SESSION_RESULTS : "результат"
+
+    CLUBS ||--o{ SETTLEMENT_PERIODS : "периоды"
+    SETTLEMENT_PERIODS ||--o{ SETTLEMENT_TRANSFERS : "переводы"
+    CLUB_MEMBERS ||--o{ SETTLEMENT_TRANSFERS : "from/to"
+
+    SESSIONS ||--o{ DISPUTES : "оспаривания"
+    USERS ||--o{ DISPUTES : "автор"
+
+    CLUBS ||--o{ LEDGER_ENTRIES : "аудит"
+    USERS ||--o{ LEDGER_ENTRIES : "автор"
+    CLUB_MEMBERS ||--o{ LEDGER_ENTRIES : "subject"
+
+    USERS {
+        uuid id PK
+        string email UK
+        string password_hash
+        string display_name
+        string telegram_chat_id
+        boolean is_superuser
+        timestamp created_at
+    }
+
+    CLUBS {
+        uuid id PK
+        string name
+        string slug UK
+        uuid created_by FK
+        string settlement_period
+        timestamp created_at
+    }
+
+    CLUB_MEMBERS {
+        uuid id PK
+        uuid club_id FK
+        uuid user_id FK
+        string role
+        string nickname
+        decimal current_balance
+        timestamp joined_at
+    }
+
+    SESSIONS {
+        uuid id PK
+        uuid club_id FK
+        uuid host_id FK
+        string type
+        string status
+        string title
+        timestamp started_at
+        timestamp ended_at
+        timestamp created_at
+    }
+
+    TABLES {
+        uuid id PK
+        uuid session_id FK
+        string name
+        string game_type
+        string blinds
+        decimal min_buy_in
+        decimal max_buy_in
+    }
+
+    SESSION_PARTICIPANTS {
+        uuid id PK
+        uuid session_id FK
+        uuid club_member_id FK
+        timestamp joined_at
+    }
+
+    BUY_IN_EVENTS {
+        uuid id PK
+        uuid table_id FK
+        uuid participant_id FK
+        decimal amount
+        timestamp occurred_at
+        uuid created_by FK
+    }
+
+    CASH_OUT_EVENTS {
+        uuid id PK
+        uuid table_id FK
+        uuid participant_id FK
+        decimal stack_amount
+        timestamp occurred_at
+        uuid created_by FK
+    }
+
+    SESSION_RESULTS {
+        uuid id PK
+        uuid session_id FK
+        uuid participant_id FK
+        decimal total_buy_in
+        decimal total_cash_out
+        decimal profit_loss
+    }
+
+    SETTLEMENT_PERIODS {
+        uuid id PK
+        uuid club_id FK
+        date period_start
+        date period_end
+        string status
+        timestamp closed_at
+    }
+
+    SETTLEMENT_TRANSFERS {
+        uuid id PK
+        uuid period_id FK
+        uuid from_member_id FK
+        uuid to_member_id FK
+        decimal amount
+        boolean confirmed
+    }
+
+    DISPUTES {
+        uuid id PK
+        uuid session_id FK
+        uuid raised_by FK
+        text description
+        string screenshot_url
+        string status
+        text resolution_note
+        timestamp created_at
+    }
+
+    LEDGER_ENTRIES {
+        uuid id PK
+        uuid club_id FK
+        uuid member_id FK
+        decimal delta
+        decimal balance_after
+        string reason
+        uuid session_id FK
+        uuid actor_user_id FK
+        timestamp created_at
+    }
