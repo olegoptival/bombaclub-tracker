@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Poker Club Tracker — Dashboard + Wizard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="tokens.css" />
+<style>
+  html, body { margin: 0; padding: 0; background: #0a0a0b; color: #f0efe9; }
+  body { font-family: 'Geist', -apple-system, system-ui, sans-serif; }
+  /* Tabs at top */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px;
+    background: rgba(10,10,11,0.85);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border-bottom: 0.5px solid rgba(255,255,255,0.08);
+  }
+  .topbar .brand {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 14px; font-weight: 600;
+  }
+  .topbar .brand .logo {
+    width: 24px; height: 24px; border-radius: 6px;
+    background: linear-gradient(135deg, #2a1f0e, #4a3618);
+    display: flex; align-items: center; justify-content: center;
+    color: #d4a437;
+    box-shadow: 0 0 0 0.5px rgba(212,164,55,0.35) inset;
+  }
+  .topbar .tabs { display: flex; gap: 4px; }
+  .topbar .tab {
+    appearance: none; border: none; background: transparent;
+    color: #8c8b83; padding: 7px 14px; border-radius: 8px;
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    font-family: inherit;
+  }
+  .topbar .tab.on { background: #1f1f25; color: #f0efe9; }
+  .topbar .meta { font-size: 11px; color: #8c8b83; font-family: 'Geist Mono', monospace; }
+  .panel { display: none; }
+  .panel.on { display: block; }
+
+  /* Centered prototype frame */
+  .proto-stage {
+    min-height: calc(100vh - 60px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+    background:
+      radial-gradient(ellipse at top, rgba(212,164,55,0.05), transparent 60%),
+      #0a0a0b;
+  }
+  .device-wrap {
+    border-radius: 48px;
+    box-shadow: 0 40px 80px rgba(0,0,0,0.5), 0 0 0 8px #1a1a1d, 0 0 0 9px #2a2a31;
+    overflow: hidden;
+  }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <span class="logo">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2C8 6 4 9 4 13a4 4 0 0 0 7 2.5L9 21h6l-2-5.5A4 4 0 0 0 20 13c0-4-4-7-8-11z"/></svg>
+      </span>
+      Poker Club Tracker
+    </div>
+    <div class="tabs">
+      <button class="tab on" data-target="prototype">Prototype</button>
+      <button class="tab" data-target="canvas">Canvas (all artboards)</button>
+      <button class="tab" data-target="ds">Design system</button>
+    </div>
+    <div class="meta">v0.1 · dashboard + wizard</div>
+  </div>
+
+  <div id="prototype" class="panel on">
+    <div class="proto-stage">
+      <div id="proto-root"></div>
+    </div>
+  </div>
+
+  <div id="canvas" class="panel">
+    <div id="canvas-root"></div>
+  </div>
+
+  <div id="ds" class="panel">
+    <div id="ds-root"></div>
+  </div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <script type="text/babel" src="data.jsx"></script>
+  <script type="text/babel" src="components.jsx"></script>
+  <script type="text/babel" src="dashboard.jsx"></script>
+  <script type="text/babel" src="wizard.jsx"></script>
+  <script type="text/babel" src="fork-and-offline.jsx"></script>
+  <script type="text/babel" src="design-system.jsx"></script>
+
+  <script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accent": "amber",
+  "density": "regular",
+  "theme": "dark",
+  "numberFormat": "plain"
+}/*EDITMODE-END*/;
+
+function applyTokens(t) {
+  const r = document.documentElement;
+  r.setAttribute('data-accent', t.accent === 'green' ? 'green' : 'amber');
+  r.setAttribute('data-density', t.density);
+  r.setAttribute('data-theme', t.theme);
+}
+
+// Tabs
+document.querySelectorAll('.topbar .tab').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.topbar .tab').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('on'));
+    document.getElementById(b.dataset.target).classList.add('on');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// Interactive prototype: dashboard ↔ wizard
+// ─────────────────────────────────────────────────────────────
+function Prototype() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [view, setView] = React.useState('dashboard'); // dashboard | fork | wizard | offline
+
+  React.useEffect(() => { applyTokens(t); }, [t]);
+
+  React.useEffect(() => {
+    const handler = (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      const txt = (btn.textContent || '').trim();
+      if (txt.startsWith('New session') && view === 'dashboard') {
+        e.stopPropagation();
+        setView('fork');
+      }
+    };
+    document.getElementById('proto-root').addEventListener('click', handler, true);
+    return () => {
+      const el = document.getElementById('proto-root');
+      if (el) el.removeEventListener('click', handler, true);
+    };
+  }, [view]);
+
+  return (
+    <>
+      <div className="device-wrap">
+        {view === 'dashboard' && <Dashboard width={390} />}
+        {view === 'fork'      && <SessionFork width={390} onClose={() => setView('dashboard')} onPick={(t) => setView(t === 'online' ? 'wizard' : 'offline')} />}
+        {view === 'wizard'    && <Wizard width={390} initialStep={1} onClose={() => setView('dashboard')} />}
+        {view === 'offline'   && <OfflineLive width={390} onClose={() => setView('dashboard')} />}
+      </div>
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="Theme" />
+        <TweakRadio label="Accent" value={t.accent}
+          options={[{value:'amber', label:'Amber'}, {value:'green', label:'Felt'}]}
+          onChange={(v) => setTweak('accent', v)} />
+        <TweakRadio label="Mode" value={t.theme}
+          options={[{value:'dark', label:'Dark'}, {value:'light', label:'Light'}]}
+          onChange={(v) => setTweak('theme', v)} />
+        <TweakRadio label="Density" value={t.density}
+          options={[{value:'regular', label:'Regular'}, {value:'compact', label:'Compact'}]}
+          onChange={(v) => setTweak('density', v)} />
+        <TweakSection label="Prototype" />
+        <TweakSelect label="Screen" value={view}
+          options={[
+            {value:'dashboard', label:'Dashboard'},
+            {value:'fork',      label:'Fork (new session)'},
+            {value:'wizard',    label:'Online wizard'},
+            {value:'offline',   label:'Offline live view'},
+          ]}
+          onChange={setView} />
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('proto-root')).render(<Prototype />);
+
+// ─────────────────────────────────────────────────────────────
+// Canvas: side-by-side artboards
+// ─────────────────────────────────────────────────────────────
+function CanvasView() {
+  React.useEffect(() => { applyTokens(TWEAK_DEFAULTS); }, []);
+  return (
+    <DesignCanvas>
+      <DCSection id="dashboard" title="Dashboard" subtitle="Mobile + desktop, dense balance + chart + last-session callout">
+        <DCArtboard id="d-mobile" label="Mobile · 390 × 844" width={390} height={844}>
+          <Dashboard width={390} />
+        </DCArtboard>
+        <DCArtboard id="d-desktop" label="Desktop · 1180 × 760" width={1180} height={760}>
+          <DashboardDesktop width={1180} height={760} />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="fork" title="New session — fork" subtitle="The deliberate choice between Online and Offline. Different flows downstream.">
+        <DCArtboard id="fork-m" label="Mobile · Fork" width={390} height={844}>
+          <SessionFork width={390} onClose={() => {}} onPick={() => {}} />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="wizard" title="Online wizard (OCR)" subtitle="4 steps · full-screen · paste support · OCR confidence per shot">
+        <DCArtboard id="w-1" label="Step 1 · Title" width={390} height={844}>
+          <Wizard width={390} initialStep={0} onClose={() => {}} />
+        </DCArtboard>
+        <DCArtboard id="w-2" label="Step 2 · Upload + OCR" width={390} height={844}>
+          <Wizard width={390} initialStep={1} onClose={() => {}} />
+        </DCArtboard>
+        <DCArtboard id="w-3" label="Step 3 · Match players" width={390} height={844}>
+          <Wizard width={390} initialStep={2} onClose={() => {}} />
+        </DCArtboard>
+        <DCArtboard id="w-4" label="Step 4 · Review &amp; confirm" width={390} height={844}>
+          <Wizard width={390} initialStep={3} onClose={() => {}} />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="offline" title="Offline live view" subtitle="The screen the host stares at during the entire game. One-handed, sticky actions, undo always visible.">
+        <DCArtboard id="off-m" label="Mobile · Live" width={390} height={844}>
+          <OfflineLive width={390} onClose={() => {}} />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="ds" title="Design system foundation" subtitle="Tokens, MoneyDisplay, PlayerAvatar, StatusBadge, Buttons, NavBar">
+        <DCArtboard id="ds-1" label="System overview" width={1180} height={1700}>
+          <DesignSystemPage width={1180} />
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+ReactDOM.createRoot(document.getElementById('canvas-root')).render(<CanvasView />);
+
+// ─────────────────────────────────────────────────────────────
+// Design system standalone view
+// ─────────────────────────────────────────────────────────────
+function DSView() {
+  React.useEffect(() => { applyTokens(TWEAK_DEFAULTS); }, []);
+  return <DesignSystemPage width={1180} />;
+}
+ReactDOM.createRoot(document.getElementById('ds-root')).render(<DSView />);
+
+// Apply on load
+applyTokens(TWEAK_DEFAULTS);
+  </script>
+</body>
+</html>
