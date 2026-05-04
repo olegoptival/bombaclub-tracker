@@ -2,23 +2,34 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 
+type ImportStatus = "pending" | "processing" | "parsed" | "failed" | "rejected" | "confirmed";
+
+type ImportPreview = {
+  table_name?: string;
+  players_count?: number;
+  balance_ok?: boolean;
+};
+
+type ImportItem = {
+  id: string;
+  status: ImportStatus;
+  error_message: string | null;
+  preview: ImportPreview | null;
+};
+
+type LocalUpload = {
+  localId: string;
+  filename: string;
+  state: "uploading" | "failed";
+  error?: string;
+};
+
 type ExistingImport = {
   id: string;
   status: string;
   image_url: string;
   error_message: string | null;
   created_at: string;
-};
-
-type UploadItem = {
-  // local id for the optimistic state, before server round-trip
-  localId: string;
-  filename: string;
-  // 'uploading' | 'pending' (waiting for OCR) | 'failed'
-  state: "uploading" | "pending" | "failed";
-  error?: string;
-  // server-side import id, once known
-  importId?: string;
 };
 
 export function UploadWizard({
@@ -28,29 +39,52 @@ export function UploadWizard({
   sessionId: string;
   existingImports: ExistingImport[];
 }) {
-  const [items, setItems] = useState<UploadItem[]>(
+  const [serverItems, setServerItems] = useState<ImportItem[]>(
     existingImports.map((i) => ({
-      localId: i.id,
-      filename: i.image_url.split("/").pop() ?? "screenshot",
-      state: i.status === "failed" ? "failed" : "pending",
-      error: i.error_message ?? undefined,
-      importId: i.id,
+      id: i.id,
+      status: i.status as ImportStatus,
+      error_message: i.error_message,
+      preview: null,
     }))
   );
+  const [localUploads, setLocalUploads] = useState<LocalUpload[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Polling status of all imports while any is pending/processing
+  useEffect(() => {
+    const anyActive = serverItems.some(
+      (i) => i.status === "pending" || i.status === "processing"
+    );
+    if (!anyActive) return;
+
+    const tick = async () => {
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}/screenshots/status`, {
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setServerItems(data.items as ImportItem[]);
+      } catch {
+        // Network blip — try again next tick
+      }
+    };
+
+    const id = window.setInterval(tick, 1500);
+    return () => window.clearInterval(id);
+  }, [sessionId, serverItems]);
 
   const uploadOne = useCallback(
     async (file: File) => {
       const localId = crypto.randomUUID();
-      setItems((prev) => [
+      setLocalUploads((prev) => [
         ...prev,
         { localId, filename: file.name, state: "uploading" },
       ]);
 
       const fd = new FormData();
       fd.append("file", file);
-
       try {
         const res = await fetch(`/api/sessions/${sessionId}/screenshots`, {
           method: "POST",
@@ -58,7 +92,7 @@ export function UploadWizard({
         });
         const data = await res.json();
         if (!res.ok) {
-          setItems((prev) =>
+          setLocalUploads((prev) =>
             prev.map((it) =>
               it.localId === localId
                 ? { ...it, state: "failed", error: data.error ?? "Upload failed" }
@@ -67,20 +101,23 @@ export function UploadWizard({
           );
           return;
         }
-        setItems((prev) =>
-          prev.map((it) =>
-            it.localId === localId
-              ? {
-                  ...it,
-                  state: "pending",
-                  importId: data.import.id,
-                }
-              : it
-          )
-        );
+        // Add to server items in pending state and remove local upload
+        setServerItems((prev) => {
+          if (prev.some((p) => p.id === data.import.id)) return prev;
+          return [
+            ...prev,
+            {
+              id: data.import.id,
+              status: data.import.status as ImportStatus,
+              error_message: null,
+              preview: null,
+            },
+          ];
+        });
+        setLocalUploads((prev) => prev.filter((it) => it.localId !== localId));
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Network error";
-        setItems((prev) =>
+        setLocalUploads((prev) =>
           prev.map((it) =>
             it.localId === localId ? { ...it, state: "failed", error: msg } : it
           )
@@ -91,14 +128,10 @@ export function UploadWizard({
   );
 
   const handleFiles = useCallback(
-    (files: FileList | File[]) => {
-      const arr = Array.from(files);
-      arr.forEach(uploadOne);
-    },
+    (files: FileList | File[]) => Array.from(files).forEach(uploadOne),
     [uploadOne]
   );
 
-  // Paste from clipboard
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
       const files: File[] = [];
@@ -126,12 +159,12 @@ export function UploadWizard({
   };
 
   const allReady =
-    items.length > 0 &&
-    items.every((it) => it.state === "pending");
+    serverItems.length > 0 &&
+    serverItems.every((i) => i.status === "parsed") &&
+    localUploads.length === 0;
 
   return (
     <div>
-      {/* Drop zone */}
       <div
         onClick={() => fileInputRef.current?.click()}
         onDragOver={(e) => {
@@ -152,18 +185,8 @@ export function UploadWizard({
           transition: "background 120ms, box-shadow 120ms",
         }}
       >
-        <div
-          style={{
-            fontSize: 28,
-            color: dragOver ? "var(--accent-hi)" : "var(--fg-2)",
-            marginBottom: 8,
-          }}
-        >
-          ↑
-        </div>
-        <div style={{ fontSize: 14, fontWeight: 600 }}>
-          Drop screenshots here
-        </div>
+        <div style={{ fontSize: 28, color: dragOver ? "var(--accent-hi)" : "var(--fg-2)", marginBottom: 8 }}>↑</div>
+        <div style={{ fontSize: 14, fontWeight: 600 }}>Drop screenshots here</div>
         <div style={{ fontSize: 12, color: "var(--fg-2)", marginTop: 4 }}>
           or tap to choose · paste also works
         </div>
@@ -180,39 +203,33 @@ export function UploadWizard({
         />
       </div>
 
-      <p
-        className="pkr-help"
-        style={{ marginTop: 10, paddingInline: 4, lineHeight: 1.5 }}
-      >
-        All screenshots must be from the SAME table session. Different tables =
-        different sessions in the app.
+      <p className="pkr-help" style={{ marginTop: 10, paddingInline: 4, lineHeight: 1.5 }}>
+        All screenshots must be from the SAME table session. Different tables = different sessions in the app.
       </p>
 
-      {/* Items list */}
-      {items.length > 0 && (
+      {(serverItems.length > 0 || localUploads.length > 0) && (
         <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 8 }}>
-          {items.map((it) => (
-            <ItemRow key={it.localId} item={it} />
+          {serverItems.map((it) => (
+            <ServerItemRow key={it.id} item={it} />
+          ))}
+          {localUploads.map((it) => (
+            <LocalItemRow key={it.localId} item={it} />
           ))}
         </div>
       )}
 
-      {/* Continue button */}
       <div style={{ marginTop: 20 }}>
         <button
           type="button"
           disabled={!allReady}
-          onClick={() => alert("OCR + matching come in the next steps")}
+          onClick={() => window.location.href = `/sessions/${sessionId}/match`}
           className="pkr-btn pkr-btn--primary pkr-btn--block"
         >
           Continue
         </button>
-        {!allReady && items.length > 0 && (
-          <p
-            className="pkr-help"
-            style={{ marginTop: 8, textAlign: "center" }}
-          >
-            Wait for all uploads to finish.
+        {!allReady && (serverItems.length > 0 || localUploads.length > 0) && (
+          <p className="pkr-help" style={{ marginTop: 8, textAlign: "center" }}>
+            Wait for all uploads and OCR to finish.
           </p>
         )}
       </div>
@@ -220,31 +237,86 @@ export function UploadWizard({
   );
 }
 
-function ItemRow({ item }: { item: UploadItem }) {
-  const stateLabel =
-    item.state === "uploading"
-      ? "Uploading…"
-      : item.state === "pending"
-      ? "Awaiting OCR"
-      : "Failed";
+function ServerItemRow({ item }: { item: ImportItem }) {
+  const label =
+    item.status === "pending"
+      ? "Queued"
+      : item.status === "processing"
+      ? "Recognizing…"
+      : item.status === "parsed"
+      ? "Parsed"
+      : item.status === "failed"
+      ? "Failed"
+      : item.status;
 
-  const stateColor =
-    item.state === "uploading"
-      ? "var(--fg-2)"
-      : item.state === "pending"
-      ? "var(--felt)"
-      : "var(--neg)";
+  const color =
+    item.status === "parsed"
+      ? "var(--pos)"
+      : item.status === "failed"
+      ? "var(--neg)"
+      : item.status === "processing"
+      ? "var(--accent)"
+      : "var(--fg-2)";
 
   return (
-    <div
-      className="pkr-card"
-      style={{
-        padding: 12,
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-      }}
-    >
+    <div className="pkr-card" style={{ padding: 12, display: "flex", alignItems: "center", gap: 12 }}>
+      <div
+        aria-hidden
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: "var(--r-sm)",
+          background: "var(--bg-2)",
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "var(--fg-3)",
+          fontSize: 18,
+        }}
+      >
+        ▦
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {item.preview && item.status === "parsed" ? (
+          <>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>
+              {item.preview.table_name ?? "Table"}
+            </div>
+            <div style={{ fontSize: 11.5, color: "var(--fg-2)", marginTop: 2 }}>
+              {item.preview.players_count ?? "?"} players
+              {item.preview.balance_ok !== undefined && (
+                <>
+                  {" · "}
+                  <span style={{ color: item.preview.balance_ok ? "var(--pos)" : "var(--status-warning)" }}>
+                    {item.preview.balance_ok ? "Sums to 0 ✓" : "Sum off"}
+                  </span>
+                </>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 13, fontWeight: 500, color: "var(--fg-2)" }} data-mono>
+              {item.id.slice(0, 8)}
+            </div>
+            <div style={{ fontSize: 11.5, color, marginTop: 2 }}>
+              {label}
+              {item.error_message && (
+                <span style={{ color: "var(--neg)" }}> · {item.error_message}</span>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LocalItemRow({ item }: { item: LocalUpload }) {
+  const color = item.state === "failed" ? "var(--neg)" : "var(--fg-2)";
+  return (
+    <div className="pkr-card" style={{ padding: 12, display: "flex", alignItems: "center", gap: 12 }}>
       <div
         aria-hidden
         style={{
@@ -274,11 +346,9 @@ function ItemRow({ item }: { item: UploadItem }) {
         >
           {item.filename}
         </div>
-        <div style={{ fontSize: 11.5, color: stateColor, marginTop: 2 }}>
-          {stateLabel}
-          {item.error && (
-            <span style={{ color: "var(--neg)" }}> · {item.error}</span>
-          )}
+        <div style={{ fontSize: 11.5, color, marginTop: 2 }}>
+          {item.state === "uploading" ? "Uploading…" : "Failed"}
+          {item.error && <span> · {item.error}</span>}
         </div>
       </div>
     </div>

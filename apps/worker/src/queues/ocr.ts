@@ -3,6 +3,7 @@ import { redis } from "../redis";
 import { log } from "../log";
 import { db } from "../db";
 import { runOcr } from "../ocr/run";
+import { persistOcrResult } from "../ocr/persist";
 
 export const OCR_QUEUE_NAME = "ocr";
 
@@ -73,6 +74,12 @@ export function startOcrWorker() {
               confidence_score: outcome.result.validation.balance_ok ? 0.95 : 0.6,
             },
           });
+          await persistOcrResult({
+            importId: imp.id,
+            sessionId: imp.session_id,
+            result: outcome.result,
+          });
+
           jobLog.info(
             { players: outcome.result.players.length, balanceOk: outcome.result.validation.balance_ok },
             "OCR import parsed"
