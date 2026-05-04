@@ -1,1 +1,13 @@
 @import "tailwindcss";
+
+@media (min-width: 640px) {
+  .pkr-bottom-nav {
+    display: none;
+  }
+}
+
+@keyframes scan {
+  0%   { top: 5%;  opacity: 0.3; }
+  50%  {           opacity: 1;   }
+  100% { top: 95%; opacity: 0.3; }
+}
