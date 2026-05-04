@@ -6,14 +6,14 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "443:443/udp"   # HTTP/3
+      - "443:443/udp"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-    # network_mode: host пока не нужен — Caddy общается с другими сервисами
-    # через docker network на Этапе 5
-    
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   caddy_data:
   caddy_config:

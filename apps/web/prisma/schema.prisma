@@ -1,0 +1,378 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model buy_in_events {
+  id                                    String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  table_id                              String               @db.Uuid
+  participant_id                        String               @db.Uuid
+  amount                                Decimal              @db.Decimal(15, 2)
+  occurred_at                           DateTime             @default(now()) @db.Timestamptz(6)
+  created_by                            String               @db.Uuid
+  created_at                            DateTime             @default(now()) @db.Timestamptz(6)
+  deleted_at                            DateTime?            @db.Timestamptz(6)
+  deleted_by                            String?              @db.Uuid
+  users_buy_in_events_created_byTousers users                @relation("buy_in_events_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction)
+  users_buy_in_events_deleted_byTousers users?               @relation("buy_in_events_deleted_byTousers", fields: [deleted_by], references: [id], onUpdate: NoAction)
+  session_participants                  session_participants @relation(fields: [participant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tables                                tables               @relation(fields: [table_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([participant_id], map: "idx_buyins_participant")
+  @@index([table_id], map: "idx_buyins_table")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model cash_out_events {
+  id                                      String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  table_id                                String               @db.Uuid
+  participant_id                          String               @db.Uuid
+  stack_amount                            Decimal              @db.Decimal(15, 2)
+  occurred_at                             DateTime             @default(now()) @db.Timestamptz(6)
+  created_by                              String               @db.Uuid
+  created_at                              DateTime             @default(now()) @db.Timestamptz(6)
+  deleted_at                              DateTime?            @db.Timestamptz(6)
+  deleted_by                              String?              @db.Uuid
+  users_cash_out_events_created_byTousers users                @relation("cash_out_events_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction)
+  users_cash_out_events_deleted_byTousers users?               @relation("cash_out_events_deleted_byTousers", fields: [deleted_by], references: [id], onUpdate: NoAction)
+  session_participants                    session_participants @relation(fields: [participant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tables                                  tables               @relation(fields: [table_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([participant_id], map: "idx_cashouts_participant")
+  @@index([table_id], map: "idx_cashouts_table")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model club_members {
+  id                                                                     String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  club_id                                                                String                 @db.Uuid
+  user_id                                                                String                 @db.Uuid
+  role                                                                   String                 @default("player") @db.VarChar(16)
+  nickname                                                               String                 @db.VarChar(64)
+  current_balance                                                        Decimal                @default(0) @db.Decimal(15, 2)
+  status                                                                 String                 @default("active") @db.VarChar(16)
+  inactive_reason                                                        String?
+  status_changed_at                                                      DateTime               @default(now()) @db.Timestamptz(6)
+  status_changed_by                                                      String?                @db.Uuid
+  joined_at                                                              DateTime               @default(now()) @db.Timestamptz(6)
+  clubs                                                                  clubs                  @relation(fields: [club_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_club_members_status_changed_byTousers                            users?                 @relation("club_members_status_changed_byTousers", fields: [status_changed_by], references: [id], onUpdate: NoAction)
+  users_club_members_user_idTousers                                      users                  @relation("club_members_user_idTousers", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  ledger_entries                                                         ledger_entries[]
+  member_aliases                                                         member_aliases[]
+  session_participants                                                   session_participants[]
+  settlement_transfers_settlement_transfers_from_member_idToclub_members settlement_transfers[] @relation("settlement_transfers_from_member_idToclub_members")
+  settlement_transfers_settlement_transfers_to_member_idToclub_members   settlement_transfers[] @relation("settlement_transfers_to_member_idToclub_members")
+
+  @@unique([club_id, nickname])
+  @@unique([club_id, user_id])
+  @@index([club_id], map: "idx_club_members_club")
+  @@index([club_id, status], map: "idx_club_members_status")
+  @@index([user_id], map: "idx_club_members_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model clubs {
+  id                                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                               String               @db.VarChar(128)
+  slug                               String               @unique @db.VarChar(64)
+  created_by                         String               @db.Uuid
+  settlement_period                  String               @default("manual") @db.VarChar(16)
+  required_aliases                   String[]             @default([])
+  dispute_window_days                Int                  @default(7)
+  created_at                         DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at                         DateTime             @default(now()) @db.Timestamptz(6)
+  club_members                       club_members[]
+  users_clubs_created_byTousers      users                @relation("clubs_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction)
+  ledger_entries                     ledger_entries[]
+  sessions                           sessions[]
+  settlement_periods                 settlement_periods[]
+  users_users_current_club_idToclubs users[]              @relation("users_current_club_idToclubs")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model disputes {
+  id                                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  session_id                        String           @db.Uuid
+  raised_by                         String           @db.Uuid
+  description                       String
+  screenshot_url                    String?          @db.VarChar(512)
+  status                            String           @default("open") @db.VarChar(16)
+  resolved_by                       String?          @db.Uuid
+  resolution_note                   String?
+  resolved_at                       DateTime?        @db.Timestamptz(6)
+  created_at                        DateTime         @default(now()) @db.Timestamptz(6)
+  users_disputes_raised_byTousers   users            @relation("disputes_raised_byTousers", fields: [raised_by], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_disputes_resolved_byTousers users?           @relation("disputes_resolved_byTousers", fields: [resolved_by], references: [id], onUpdate: NoAction)
+  sessions                          sessions         @relation(fields: [session_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  ledger_entries                    ledger_entries[]
+
+  @@index([session_id], map: "idx_disputes_session")
+  @@index([status], map: "idx_disputes_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model ledger_entries {
+  id                   String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  club_id              String                @db.Uuid
+  member_id            String                @db.Uuid
+  delta                Decimal               @db.Decimal(15, 2)
+  balance_after        Decimal               @db.Decimal(15, 2)
+  reason               String                @db.VarChar(32)
+  description          String?
+  session_id           String?               @db.Uuid
+  transfer_id          String?               @db.Uuid
+  dispute_id           String?               @db.Uuid
+  actor_user_id        String?               @db.Uuid
+  created_at           DateTime              @default(now()) @db.Timestamptz(6)
+  users                users?                @relation(fields: [actor_user_id], references: [id], onUpdate: NoAction)
+  clubs                clubs                 @relation(fields: [club_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  disputes             disputes?             @relation(fields: [dispute_id], references: [id], onUpdate: NoAction)
+  club_members         club_members          @relation(fields: [member_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sessions             sessions?             @relation(fields: [session_id], references: [id], onUpdate: NoAction)
+  settlement_transfers settlement_transfers? @relation(fields: [transfer_id], references: [id], onUpdate: NoAction)
+
+  @@index([club_id, created_at], map: "idx_ledger_club_time")
+  @@index([member_id, created_at], map: "idx_ledger_member_time")
+}
+
+model member_aliases {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  club_member_id String       @db.Uuid
+  source         String       @db.VarChar(32)
+  alias_name     String       @db.VarChar(64)
+  alias_id       String?      @db.VarChar(32)
+  created_at     DateTime     @default(now()) @db.Timestamptz(6)
+  club_members   club_members @relation(fields: [club_member_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([source, alias_name, alias_id])
+  @@index([source, alias_name], map: "idx_member_aliases_lookup")
+  @@index([club_member_id], map: "idx_member_aliases_member")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model notifications {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id       String    @db.Uuid
+  event_type    String    @db.VarChar(64)
+  payload       Json      @default("{}")
+  status        String    @default("pending") @db.VarChar(16)
+  error_message String?
+  retry_count   Int       @default(0)
+  scheduled_for DateTime  @default(now()) @db.Timestamptz(6)
+  sent_at       DateTime? @db.Timestamptz(6)
+  created_at    DateTime  @default(now()) @db.Timestamptz(6)
+  users         users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id, created_at(sort: Desc)], map: "idx_notifications_user_time")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model ocr_imports {
+  id                                    String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  session_id                            String               @db.Uuid
+  table_id                              String?              @db.Uuid
+  image_url                             String               @db.VarChar(512)
+  image_hash                            String               @db.VarChar(64)
+  status                                String               @default("pending") @db.VarChar(16)
+  raw_response                          Json?
+  parsed_data                           Json?
+  provider                              String?              @db.VarChar(32)
+  confidence_score                      Decimal?             @db.Decimal(3, 2)
+  error_message                         String?
+  snapshot_period_start                 DateTime?            @db.Timestamptz(6)
+  snapshot_period_end                   DateTime?            @db.Timestamptz(6)
+  uploaded_by                           String               @db.Uuid
+  confirmed_by                          String?              @db.Uuid
+  confirmed_at                          DateTime?            @db.Timestamptz(6)
+  created_at                            DateTime             @default(now()) @db.Timestamptz(6)
+  processed_at                          DateTime?            @db.Timestamptz(6)
+  users_ocr_imports_confirmed_byTousers users?               @relation("ocr_imports_confirmed_byTousers", fields: [confirmed_by], references: [id], onUpdate: NoAction)
+  sessions                              sessions             @relation(fields: [session_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tables                                tables?              @relation(fields: [table_id], references: [id], onUpdate: NoAction)
+  users_ocr_imports_uploaded_byTousers  users                @relation("ocr_imports_uploaded_byTousers", fields: [uploaded_by], references: [id], onUpdate: NoAction)
+  ocr_screen_results                    ocr_screen_results[]
+
+  @@unique([session_id, image_hash], map: "idx_ocr_unique_image_per_session")
+  @@index([session_id], map: "idx_ocr_session")
+  @@index([status], map: "idx_ocr_status")
+  @@index([table_id], map: "idx_ocr_table")
+}
+
+model ocr_screen_results {
+  id                   String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ocr_import_id        String               @db.Uuid
+  participant_id       String               @db.Uuid
+  recognized_name      String?              @db.VarChar(64)
+  recognized_alias_id  String?              @db.VarChar(32)
+  profit_loss          Decimal              @db.Decimal(15, 2)
+  fee                  Decimal              @default(0) @db.Decimal(15, 2)
+  created_at           DateTime             @default(now()) @db.Timestamptz(6)
+  ocr_imports          ocr_imports          @relation(fields: [ocr_import_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  session_participants session_participants @relation(fields: [participant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([ocr_import_id, participant_id])
+  @@index([ocr_import_id], map: "idx_screen_results_import")
+  @@index([participant_id], map: "idx_screen_results_participant")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model session_participants {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  session_id         String               @db.Uuid
+  club_member_id     String?              @db.Uuid
+  guest_name         String?              @db.VarChar(64)
+  joined_at          DateTime             @default(now()) @db.Timestamptz(6)
+  buy_in_events      buy_in_events[]
+  cash_out_events    cash_out_events[]
+  ocr_screen_results ocr_screen_results[]
+  club_members       club_members?        @relation(fields: [club_member_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  sessions           sessions             @relation(fields: [session_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  session_results    session_results[]
+
+  @@unique([session_id, club_member_id])
+  @@index([club_member_id], map: "idx_participants_member")
+  @@index([session_id], map: "idx_participants_session")
+}
+
+model session_results {
+  id                   String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  session_id           String               @db.Uuid
+  participant_id       String               @db.Uuid
+  total_buy_in         Decimal              @default(0) @db.Decimal(15, 2)
+  total_cash_out       Decimal              @default(0) @db.Decimal(15, 2)
+  profit_loss          Decimal              @default(0) @db.Decimal(15, 2)
+  created_at           DateTime             @default(now()) @db.Timestamptz(6)
+  session_participants session_participants @relation(fields: [participant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sessions             sessions             @relation(fields: [session_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([session_id, participant_id])
+  @@index([participant_id], map: "idx_results_participant")
+  @@index([session_id], map: "idx_results_session")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model sessions {
+  id                                 String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  club_id                            String                 @db.Uuid
+  host_id                            String                 @db.Uuid
+  co_host_id                         String?                @db.Uuid
+  type                               String                 @db.VarChar(16)
+  status                             String                 @default("created") @db.VarChar(16)
+  title                              String?                @db.VarChar(255)
+  started_at                         DateTime?              @db.Timestamptz(6)
+  ended_at                           DateTime?              @db.Timestamptz(6)
+  last_activity_at                   DateTime?              @db.Timestamptz(6)
+  auto_closed                        Boolean                @default(false)
+  cancelled_at                       DateTime?              @db.Timestamptz(6)
+  cancelled_by                       String?                @db.Uuid
+  created_at                         DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at                         DateTime               @default(now()) @db.Timestamptz(6)
+  disputes                           disputes[]
+  ledger_entries                     ledger_entries[]
+  ocr_imports                        ocr_imports[]
+  session_participants               session_participants[]
+  session_results                    session_results[]
+  users_sessions_cancelled_byTousers users?                 @relation("sessions_cancelled_byTousers", fields: [cancelled_by], references: [id], onUpdate: NoAction)
+  clubs                              clubs                  @relation(fields: [club_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_sessions_co_host_idTousers   users?                 @relation("sessions_co_host_idTousers", fields: [co_host_id], references: [id], onUpdate: NoAction)
+  users_sessions_host_idTousers      users                  @relation("sessions_host_idTousers", fields: [host_id], references: [id], onUpdate: NoAction)
+  tables                             tables[]
+
+  @@index([club_id, status], map: "idx_sessions_club_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model settlement_periods {
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  club_id              String                 @db.Uuid
+  period_start         DateTime               @db.Date
+  period_end           DateTime               @db.Date
+  status               String                 @default("open") @db.VarChar(16)
+  closed_at            DateTime?              @db.Timestamptz(6)
+  closed_by            String?                @db.Uuid
+  created_at           DateTime               @default(now()) @db.Timestamptz(6)
+  users                users?                 @relation(fields: [closed_by], references: [id], onUpdate: NoAction)
+  clubs                clubs                  @relation(fields: [club_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  settlement_transfers settlement_transfers[]
+
+  @@index([club_id, status], map: "idx_periods_club")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model settlement_transfers {
+  id                                                             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  period_id                                                      String             @db.Uuid
+  from_member_id                                                 String             @db.Uuid
+  to_member_id                                                   String             @db.Uuid
+  amount                                                         Decimal            @db.Decimal(15, 2)
+  confirmed_by_from                                              Boolean            @default(false)
+  confirmed_by_to                                                Boolean            @default(false)
+  confirmed_at                                                   DateTime?          @db.Timestamptz(6)
+  created_at                                                     DateTime           @default(now()) @db.Timestamptz(6)
+  ledger_entries                                                 ledger_entries[]
+  club_members_settlement_transfers_from_member_idToclub_members club_members       @relation("settlement_transfers_from_member_idToclub_members", fields: [from_member_id], references: [id], onUpdate: NoAction)
+  settlement_periods                                             settlement_periods @relation(fields: [period_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  club_members_settlement_transfers_to_member_idToclub_members   club_members       @relation("settlement_transfers_to_member_idToclub_members", fields: [to_member_id], references: [id], onUpdate: NoAction)
+
+  @@index([from_member_id], map: "idx_transfers_from")
+  @@index([period_id], map: "idx_transfers_period")
+  @@index([to_member_id], map: "idx_transfers_to")
+}
+
+model tables {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  session_id      String            @db.Uuid
+  name            String?           @db.VarChar(64)
+  game_type       String?           @default("NLH") @db.VarChar(32)
+  blinds          String?           @db.VarChar(16)
+  min_buy_in      Decimal?          @db.Decimal(15, 2)
+  max_buy_in      Decimal?          @db.Decimal(15, 2)
+  created_at      DateTime          @default(now()) @db.Timestamptz(6)
+  buy_in_events   buy_in_events[]
+  cash_out_events cash_out_events[]
+  ocr_imports     ocr_imports[]
+  sessions        sessions          @relation(fields: [session_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([session_id], map: "idx_tables_session")
+}
+
+model users {
+  id                                                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  login                                              String               @unique @db.VarChar(64)
+  password_hash                                      String               @db.VarChar(255)
+  password_changed_at                                DateTime?            @db.Timestamptz(6)
+  display_name                                       String               @db.VarChar(128)
+  email                                              String?              @unique @db.VarChar(255)
+  telegram_chat_id                                   BigInt?              @unique
+  telegram_username                                  String?              @db.VarChar(64)
+  is_superuser                                       Boolean              @default(false)
+  current_club_id                                    String?              @db.Uuid
+  created_at                                         DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at                                         DateTime             @default(now()) @db.Timestamptz(6)
+  buy_in_events_buy_in_events_created_byTousers      buy_in_events[]      @relation("buy_in_events_created_byTousers")
+  buy_in_events_buy_in_events_deleted_byTousers      buy_in_events[]      @relation("buy_in_events_deleted_byTousers")
+  cash_out_events_cash_out_events_created_byTousers  cash_out_events[]    @relation("cash_out_events_created_byTousers")
+  cash_out_events_cash_out_events_deleted_byTousers  cash_out_events[]    @relation("cash_out_events_deleted_byTousers")
+  club_members_club_members_status_changed_byTousers club_members[]       @relation("club_members_status_changed_byTousers")
+  club_members_club_members_user_idTousers           club_members[]       @relation("club_members_user_idTousers")
+  clubs_clubs_created_byTousers                      clubs[]              @relation("clubs_created_byTousers")
+  disputes_disputes_raised_byTousers                 disputes[]           @relation("disputes_raised_byTousers")
+  disputes_disputes_resolved_byTousers               disputes[]           @relation("disputes_resolved_byTousers")
+  ledger_entries                                     ledger_entries[]
+  notifications                                      notifications[]
+  ocr_imports_ocr_imports_confirmed_byTousers        ocr_imports[]        @relation("ocr_imports_confirmed_byTousers")
+  ocr_imports_ocr_imports_uploaded_byTousers         ocr_imports[]        @relation("ocr_imports_uploaded_byTousers")
+  sessions_sessions_cancelled_byTousers              sessions[]           @relation("sessions_cancelled_byTousers")
+  sessions_sessions_co_host_idTousers                sessions[]           @relation("sessions_co_host_idTousers")
+  sessions_sessions_host_idTousers                   sessions[]           @relation("sessions_host_idTousers")
+  settlement_periods                                 settlement_periods[]
+  clubs_users_current_club_idToclubs                 clubs?               @relation("users_current_club_idToclubs", fields: [current_club_id], references: [id], onUpdate: NoAction, map: "fk_users_current_club")
+
+  @@index([login], map: "idx_users_login")
+}

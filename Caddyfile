@@ -1,20 +1,16 @@
 bombaclub.live, www.bombaclub.live {
-    # Заглушка пока нет приложения. Заменим на reverse_proxy на Этапе 5.
-    respond "Bombaclub Tracker — coming soon" 200
-    
-    # Логи доступа в JSON
+    reverse_proxy host.docker.internal:3000
+
     log {
         output stdout
         format json
     }
-    
-    # Безопасные дефолты заголовков
+
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
         X-Content-Type-Options "nosniff"
         X-Frame-Options "DENY"
         Referrer-Policy "strict-origin-when-cross-origin"
-        # Скрываем что это Caddy
         -Server
     }
 }
