@@ -1,6 +1,13 @@
 -- ============================================================================
--- Poker Club Tracker — Schema v1.0
--- PostgreSQL 14+
+-- Bombaclub Tracker — Schema v1.1 (web edition)
+-- PostgreSQL 16+
+--
+-- Изменения от v1.0 (bot edition):
+--   * users: добавлены login (UNIQUE NOT NULL), password_hash NOT NULL,
+--     password_changed_at; telegram_chat_id стал опциональным
+--   * club_members.status: только 'active' / 'inactive' (без pending/rejected,
+--     т.к. в веб-версии пользователей создаёт super-admin сразу активными)
+--   * Удалена таблица club_invites — инвайт-ссылки в веб-версии не используются
 --
 -- Архитектурные принципы:
 --   * UUID PK везде (gen_random_uuid)
@@ -18,27 +25,33 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;  -- для gen_random_uuid()
 -- ГРУППА 1: ПОЛЬЗОВАТЕЛИ И КЛУБЫ
 -- ============================================================================
 
--- Глобальный аккаунт человека. Один email/telegram_chat_id = один user.
--- На фазе 1 (только бот) email и password_hash могут быть NULL.
+-- Глобальный аккаунт человека. Один login = один user.
+-- Логин и пароль выдаёт super-admin при создании пользователя.
+-- При первом входе пользователь обязан сменить пароль (password_changed_at = NULL).
 CREATE TABLE users (
-    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    telegram_chat_id    BIGINT UNIQUE NOT NULL,
-    telegram_username   VARCHAR(64),                 -- @vasya, может меняться юзером
-    display_name        VARCHAR(128) NOT NULL,       -- имя для UI
-    email               VARCHAR(255) UNIQUE,         -- для будущей веб-версии
-    password_hash       VARCHAR(255),                -- для будущей веб-версии
-    is_superuser        BOOLEAN NOT NULL DEFAULT FALSE,
+    id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    login                 VARCHAR(64) UNIQUE NOT NULL,         -- основной идентификатор для входа
+    password_hash         VARCHAR(255) NOT NULL,               -- bcrypt/argon2
+    password_changed_at   TIMESTAMPTZ,                         -- NULL = временный пароль, надо сменить при входе
+    display_name          VARCHAR(128) NOT NULL,               -- имя для UI
+
+    -- Опциональные каналы для уведомлений (заполняются позже самим юзером)
+    email                 VARCHAR(255) UNIQUE,                 -- для email-уведомлений
+    telegram_chat_id      BIGINT UNIQUE,                       -- для Telegram-уведомлений
+    telegram_username     VARCHAR(64),                         -- @vasya, информационно
+
+    is_superuser          BOOLEAN NOT NULL DEFAULT FALSE,
 
     -- Текущий выбранный клуб (для команд, где контекст важен).
     -- Обновляется когда пользователь переключается между клубами.
     -- Для пользователей в одном клубе это просто его клуб.
-    current_club_id     UUID,                        -- FK добавляется ниже (DEFERRABLE)
+    current_club_id       UUID,                                -- FK добавляется ниже (DEFERRABLE)
 
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_users_telegram_chat_id ON users(telegram_chat_id);
+CREATE INDEX idx_users_login ON users(login);
 
 
 -- Клуб (компания друзей).
@@ -85,13 +98,13 @@ CREATE TABLE club_members (
     current_balance     DECIMAL(15,2) NOT NULL DEFAULT 0,  -- кэш, источник истины — ledger
 
     -- Жизненный цикл членства:
-    --   pending   — заявка по инвайту, ждёт подтверждения host'ом
     --   active    — обычный активный член клуба
-    --   rejected  — заявка отклонена host'ом
     --   inactive  — исключён из клуба host'ом
-    status              VARCHAR(16) NOT NULL DEFAULT 'pending'
-        CHECK (status IN ('pending', 'active', 'rejected', 'inactive')),
-    rejected_reason     TEXT,                        -- причина отказа/исключения
+    -- В веб-версии нет 'pending'/'rejected' — пользователей создаёт
+    -- super-admin сразу активными.
+    status              VARCHAR(16) NOT NULL DEFAULT 'active'
+        CHECK (status IN ('active', 'inactive')),
+    inactive_reason     TEXT,                        -- причина исключения (если status=inactive)
     status_changed_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     status_changed_by   UUID REFERENCES users(id) ON DELETE SET NULL,
 
@@ -124,19 +137,9 @@ CREATE INDEX idx_member_aliases_lookup ON member_aliases(source, alias_name);
 CREATE INDEX idx_member_aliases_member ON member_aliases(club_member_id);
 
 
--- Инвайты для добавления игроков в клуб
-CREATE TABLE club_invites (
-    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    club_id             UUID NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
-    token               VARCHAR(32) UNIQUE NOT NULL,
-    created_by          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    expires_at          TIMESTAMPTZ NOT NULL,
-    used_by_user_id     UUID REFERENCES users(id) ON DELETE SET NULL,
-    used_at             TIMESTAMPTZ,
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_club_invites_token ON club_invites(token) WHERE used_at IS NULL;
+-- Таблица club_invites из v1.0 (bot edition) удалена —
+-- в веб-версии пользователей создаёт super-admin через админ-панель,
+-- инвайт-ссылки не используются.
 
 
 -- ============================================================================
