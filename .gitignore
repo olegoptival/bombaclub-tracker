@@ -1,0 +1,27 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# next
+.next/
+out/
+
+# env
+.env
+.env.local
+.env.*.local
+
+# logs
+*.log
+
+# os
+.DS_Store
+
+# build
+dist/
+build/
+*.tsbuildinfo
+
+# editors
+.vscode/
+.idea/
