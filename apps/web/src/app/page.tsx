@@ -18,19 +18,45 @@ export default async function Home() {
   ];
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-zinc-950 text-zinc-100 p-8">
-      <div className="text-center space-y-6 max-w-md">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight">Bombaclub Tracker</h1>
-          <p className="text-zinc-500 text-sm">Stage 2 — DB connected via Prisma ✓</p>
+    <main
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 32,
+      }}
+    >
+      <div style={{ maxWidth: 460, width: "100%" }}>
+        <div style={{ marginBottom: 28 }}>
+          <h1 style={{ fontSize: 32, fontWeight: 600, letterSpacing: "-0.02em", marginBottom: 6 }}>
+            Bombaclub Tracker
+          </h1>
+          <p style={{ fontSize: 14, color: "var(--fg-2)" }}>
+            Stage 2 — DB connected via Prisma ✓
+          </p>
         </div>
-        <div className="grid grid-cols-2 gap-3 text-left">
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           {stats.map((s) => (
-            <div key={s.label} className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3">
-              <div className="text-xs text-zinc-500 uppercase tracking-wider">{s.label}</div>
-              <div className="text-2xl font-mono mt-1">{s.value}</div>
+            <div
+              key={s.label}
+              className="pkr-card"
+              style={{ padding: 16 }}
+            >
+              <div className="pkr-section-label" style={{ marginBottom: 6 }}>
+                {s.label}
+              </div>
+              <div data-mono style={{ fontSize: 28, fontWeight: 500 }}>
+                {s.value}
+              </div>
             </div>
           ))}
+        </div>
+
+        <div style={{ marginTop: 24, display: "flex", gap: 8 }}>
+          <button className="pkr-btn pkr-btn--primary">Primary</button>
+          <button className="pkr-btn pkr-btn--ghost">Ghost</button>
         </div>
       </div>
     </main>

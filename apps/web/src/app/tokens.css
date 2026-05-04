@@ -1,0 +1,251 @@
+/* ─────────────────────────────────────────────────────────────
+   Bombaclub Tracker — Design Tokens
+   Late-night, focused, slightly luxurious.
+   ───────────────────────────────────────────────────────────── */
+
+
+:root {
+  /* ── Palette: dark base ────────────────────────────────── */
+  --bg-0: #0a0a0b;          /* page */
+  --bg-1: #111114;          /* card */
+  --bg-2: #17171c;          /* nested card / input */
+  --bg-3: #1f1f25;          /* hover, raised */
+  --bg-4: #2a2a31;          /* divider-ish surface */
+
+  /* Hairline divider */
+  --line: rgba(255, 255, 255, 0.06);
+  --line-strong: rgba(255, 255, 255, 0.10);
+
+  /* Text */
+  --fg-0: #f0efe9;          /* primary */
+  --fg-1: #c9c8c0;          /* secondary */
+  --fg-2: #8c8b83;          /* tertiary / labels */
+  --fg-3: #5a5a55;          /* placeholder / disabled */
+
+  /* Accent — amber/whiskey */
+  --accent: #d4a437;
+  --accent-hi: #e6b94a;
+  --accent-lo: #a87f1e;
+  --accent-soft: rgba(212, 164, 55, 0.14);
+  --accent-ring: rgba(212, 164, 55, 0.35);
+
+  /* Felt green — used as secondary accent + online session marker */
+  --felt: #1e8a4f;
+  --felt-soft: rgba(30, 138, 79, 0.12);
+
+  /* Money colors — muted, never neon */
+  --pos: #6fbf73;
+  --pos-soft: rgba(111, 191, 115, 0.10);
+  --neg: #d97565;
+  --neg-soft: rgba(217, 117, 101, 0.10);
+  --neutral: var(--fg-1);
+
+  /* Status colors */
+  --status-ended: var(--fg-2);
+  --status-live: var(--felt);
+  --status-disputed: #d97565;
+  --status-cancelled: #6b6b66;
+  --status-warning: #d4a437;
+
+  /* Shadow */
+  --shadow-sm: 0 1px 0 rgba(0,0,0,0.4), 0 0 0 0.5px rgba(255,255,255,0.04);
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.45), 0 0 0 0.5px rgba(255,255,255,0.05);
+  --shadow-lg: 0 18px 40px rgba(0,0,0,0.55), 0 0 0 0.5px rgba(255,255,255,0.06);
+
+  /* Type */
+  --font-ui: var(--font-geist-sans), -apple-system, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Radii — calm, not too round */
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+
+  /* Density (driven by Tweaks) */
+  --pad-card: 16px;
+  --row-h: 56px;
+  --gap-y: 14px;
+}
+
+/* Compact density */
+[data-density="compact"] {
+  --pad-card: 12px;
+  --row-h: 48px;
+  --gap-y: 10px;
+}
+
+/* Light theme — bonus */
+[data-theme="light"] {
+  --bg-0: #f7f5ef;
+  --bg-1: #ffffff;
+  --bg-2: #f3f0e8;
+  --bg-3: #ebe7dc;
+  --bg-4: #e0dccd;
+  --line: rgba(0, 0, 0, 0.06);
+  --line-strong: rgba(0, 0, 0, 0.12);
+  --fg-0: #1a1814;
+  --fg-1: #43413a;
+  --fg-2: #6b6960;
+  --fg-3: #9a9890;
+  --accent-soft: rgba(212, 164, 55, 0.18);
+  --pos: #2f8c44;
+  --neg: #b84a3b;
+  --shadow-sm: 0 1px 0 rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 14px rgba(20,15,5,0.08);
+  --shadow-lg: 0 18px 40px rgba(20,15,5,0.12);
+}
+
+/* Felt-green accent variant */
+[data-accent="green"] {
+  --accent: #2f9d5a;
+  --accent-hi: #3eb56c;
+  --accent-lo: #1f7a44;
+  --accent-soft: rgba(47, 157, 90, 0.14);
+  --accent-ring: rgba(47, 157, 90, 0.40);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Base — applied to body when wrapped in .pkr OR globally if you prefer
+   ───────────────────────────────────────────────────────────── */
+html, body {
+  background: var(--bg-0);
+  color: var(--fg-0);
+  font-family: var(--font-ui);
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+button { font-family: inherit; }
+
+/* mono numerals everywhere it matters */
+.mono,
+[data-mono] {
+  font-family: var(--font-mono);
+  font-feature-settings: 'tnum', 'zero';
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Buttons
+   ───────────────────────────────────────────────────────────── */
+.pkr-btn {
+  appearance: none;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: var(--r-md);
+  font: 500 14.5px/1 var(--font-ui);
+  letter-spacing: -0.01em;
+  transition: background 120ms, transform 80ms, box-shadow 120ms;
+  white-space: nowrap;
+}
+.pkr-btn:active { transform: translateY(0.5px); }
+.pkr-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.pkr-btn--primary {
+  background: var(--accent);
+  color: #1a1408;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.18) inset, 0 4px 12px rgba(212,164,55,0.18);
+  font-weight: 600;
+}
+.pkr-btn--primary:hover { background: var(--accent-hi); }
+
+.pkr-btn--ghost {
+  background: var(--bg-2);
+  color: var(--fg-0);
+  box-shadow: 0 0 0 0.5px var(--line-strong) inset;
+}
+.pkr-btn--ghost:hover { background: var(--bg-3); }
+
+.pkr-btn--danger {
+  background: #3a1f1c;
+  color: #f4b8af;
+  box-shadow: 0 0 0 0.5px rgba(217,117,101,0.35) inset;
+}
+.pkr-btn--danger:hover { background: #4a2723; }
+
+.pkr-btn--sm { height: 32px; padding: 0 12px; font-size: 13px; border-radius: var(--r-sm); }
+.pkr-btn--block { width: 100%; }
+
+/* ─────────────────────────────────────────────────────────────
+   Card / surface
+   ───────────────────────────────────────────────────────────── */
+.pkr-card {
+  background: var(--bg-1);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+}
+.pkr-card--raised { box-shadow: var(--shadow-md); }
+
+/* ─────────────────────────────────────────────────────────────
+   Inputs
+   ───────────────────────────────────────────────────────────── */
+.pkr-input {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  border: none;
+  background: var(--bg-2);
+  color: var(--fg-0);
+  border-radius: var(--r-md);
+  font: 500 15px/1 var(--font-ui);
+  outline: none;
+  box-shadow: 0 0 0 0.5px var(--line-strong) inset;
+  transition: box-shadow 120ms;
+}
+.pkr-input::placeholder { color: var(--fg-3); }
+.pkr-input:focus { box-shadow: 0 0 0 1.5px var(--accent-ring) inset; }
+
+.pkr-label {
+  display: block;
+  font: 500 12px/1 var(--font-ui);
+  color: var(--fg-2);
+  margin-bottom: 6px;
+  letter-spacing: 0.02em;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Form-error / helpers
+   ───────────────────────────────────────────────────────────── */
+.pkr-error {
+  font: 500 12.5px/1.4 var(--font-ui);
+  color: var(--neg);
+  background: var(--neg-soft);
+  padding: 8px 12px;
+  border-radius: var(--r-sm);
+  margin-top: 8px;
+}
+.pkr-help {
+  font: 400 12px/1.4 var(--font-ui);
+  color: var(--fg-2);
+  margin-top: 6px;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Misc
+   ───────────────────────────────────────────────────────────── */
+.pkr-hairline { height: 0.5px; background: var(--line); }
+.pkr-section-label {
+  font: 500 11px/1 var(--font-ui);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-2);
+}
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb {
+  background: var(--bg-3);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-track { background: transparent; }
