@@ -4,6 +4,7 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { s3, S3_BUCKET } from "@/lib/s3";
+import { enqueueOcrJob } from "@/lib/queues/ocr-producer";
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8 MB
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -116,8 +117,7 @@ export async function POST(
     },
   });
 
-  // TODO: enqueue OCR job in BullMQ — Stage 4 worker
-  // For now status stays 'pending' forever until we wire the worker.
+  await enqueueOcrJob(imp.id);
 
   return NextResponse.json({ ok: true, import: imp });
 }
