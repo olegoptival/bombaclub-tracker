@@ -2,16 +2,12 @@ import { Queue, Worker, type Job } from "bullmq";
 import { redis } from "../redis";
 import { log } from "../log";
 import { db } from "../db";
+import { runOcr } from "../ocr/run";
 
 export const OCR_QUEUE_NAME = "ocr";
 
-export type OcrJobData = {
-  importId: string;
-};
+export type OcrJobData = { importId: string };
 
-// Producer (used by web app to enqueue work — but web has its own copy of this
-// const, see src/lib/queues/ocr-producer.ts in apps/web).
-// Here we only need the consumer side.
 export const ocrQueue = new Queue<OcrJobData>(OCR_QUEUE_NAME, {
   connection: redis,
 });
@@ -50,21 +46,67 @@ export function startOcrWorker() {
       });
 
       try {
-        // TODO Stage 4.4: actual OCR via Claude Vision
-        // For now: stub success after 2 seconds
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        const t0 = Date.now();
+        const outcome = await runOcr(imp.image_url);
+        const elapsedMs = Date.now() - t0;
+        jobLog.info({ outcome: outcome.kind, elapsedMs }, "OCR call finished");
 
+        if (outcome.kind === "success") {
+          // Periodicity from the table block (may be null in some screens)
+          const periodStart = outcome.result.table.period_start
+            ? new Date(outcome.result.table.period_start)
+            : null;
+          const periodEnd = outcome.result.table.period_end
+            ? new Date(outcome.result.table.period_end)
+            : null;
+
+          await db.ocr_imports.update({
+            where: { id: imp.id },
+            data: {
+              status: "parsed",
+              processed_at: new Date(),
+              provider: MODEL_NAME,
+              raw_response: { text: outcome.rawText },
+              parsed_data: outcome.result as unknown as object,
+              snapshot_period_start: periodStart,
+              snapshot_period_end: periodEnd,
+              confidence_score: outcome.result.validation.balance_ok ? 0.95 : 0.6,
+            },
+          });
+          jobLog.info(
+            { players: outcome.result.players.length, balanceOk: outcome.result.validation.balance_ok },
+            "OCR import parsed"
+          );
+          return;
+        }
+
+        if (outcome.kind === "not_a_game_screen") {
+          await db.ocr_imports.update({
+            where: { id: imp.id },
+            data: {
+              status: "failed",
+              processed_at: new Date(),
+              provider: MODEL_NAME,
+              raw_response: { text: outcome.rawText },
+              error_message: `Not a ClubGG game screen: ${outcome.description}`,
+            },
+          });
+          jobLog.warn({ description: outcome.description }, "Not a game screen");
+          return;
+        }
+
+        // invalid_response
         await db.ocr_imports.update({
           where: { id: imp.id },
           data: {
-            status: "parsed",
+            status: "failed",
             processed_at: new Date(),
-            provider: "stub",
-            parsed_data: { stub: true },
+            provider: MODEL_NAME,
+            raw_response: { text: outcome.rawText },
+            error_message: `Invalid OCR response: ${outcome.reason}`,
           },
         });
-
-        jobLog.info("OCR job completed (stub)");
+        jobLog.warn({ reason: outcome.reason }, "Invalid OCR response");
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         await db.ocr_imports.update({
@@ -81,7 +123,7 @@ export function startOcrWorker() {
     },
     {
       connection: redis,
-      concurrency: 1, // 1 OCR at a time on a 2GB VPS
+      concurrency: 1,
     }
   );
 
@@ -90,3 +132,5 @@ export function startOcrWorker() {
     log.error({ err, queue: OCR_QUEUE_NAME }, "Worker error")
   );
 }
+
+const MODEL_NAME = "claude-sonnet-4-5";
