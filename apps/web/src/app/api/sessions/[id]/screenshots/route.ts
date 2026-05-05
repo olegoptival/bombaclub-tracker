@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { s3, S3_BUCKET } from "@/lib/s3";
+import { getS3, getS3Bucket } from "@/lib/s3";
 import { enqueueOcrJob } from "@/lib/queues/ocr-producer";
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8 MB
@@ -73,7 +73,8 @@ export async function POST(
   const hash = createHash("sha256").update(buf).digest("hex");
   const ext = EXT_MAP[file.type];
   const key = `sessions/${sessionId}/${hash}.${ext}`;
-  const imageUrl = `s3://${S3_BUCKET}/${key}`;
+  const bucket = getS3Bucket();
+  const imageUrl = `s3://${bucket}/${key}`;
 
   // Idempotency: same hash for same session = the same screenshot, skip duplicate
   const existing = await db.ocr_imports.findFirst({
@@ -92,9 +93,9 @@ export async function POST(
   }
 
   // Upload to MinIO
-  await s3.send(
+  await getS3().send(
     new PutObjectCommand({
-      Bucket: S3_BUCKET,
+      Bucket: bucket,
       Key: key,
       Body: buf,
       ContentType: file.type,

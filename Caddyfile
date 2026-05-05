@@ -1,5 +1,5 @@
 bombaclub.live, www.bombaclub.live {
-    reverse_proxy host.docker.internal:3000
+    reverse_proxy web:3000
 
     log {
         output stdout

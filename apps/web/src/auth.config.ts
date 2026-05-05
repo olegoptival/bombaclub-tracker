@@ -7,6 +7,7 @@ import type { NextAuthConfig } from "next-auth";
  * The actual `authorize` (with DB lookup) lives in src/auth.ts.
  */
 export const authConfig: NextAuthConfig = {
+  trustHost: true,
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   providers: [], // filled in src/auth.ts

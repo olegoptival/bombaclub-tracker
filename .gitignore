@@ -25,3 +25,5 @@ build/
 # editors
 .vscode/
 .idea/
+.env.prod
+.env.*.local
