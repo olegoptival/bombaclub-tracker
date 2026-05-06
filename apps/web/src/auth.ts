@@ -26,12 +26,28 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         const { login, password } = parsed.data;
         const user = await db.users.findUnique({
           where: { login },
-          select: { id: true, login: true, password_hash: true },
+          select: {
+            id: true,
+            login: true,
+            password_hash: true,
+            is_superuser: true,
+            club_members_club_members_user_idTousers: {
+              select: { status: true },
+            },
+          },
         });
         if (!user) return null;
 
         const ok = await bcrypt.compare(password, user.password_hash);
         if (!ok) return null;
+
+        // Block deactivated users — but never block super-admin even if
+        // they have no active memberships.
+        if (!user.is_superuser) {
+          const memberships = user.club_members_club_members_user_idTousers;
+          const hasActive = memberships.some((m) => m.status === "active");
+          if (memberships.length > 0 && !hasActive) return null;
+        }
 
         return { id: user.id, login: user.login };
       },

@@ -3,6 +3,7 @@ import { logoutAction } from "@/lib/actions/logout";
 import { db } from "@/lib/db";
 import type { AppContext } from "@/lib/session/context";
 import { MoneyDisplay } from "@/components/money-display";
+import { ClubSwitcher } from "@/components/club-switcher";
 
 export async function PlayerDashboard({ ctx }: { ctx: AppContext }) {
   const club = ctx.activeClub!;
@@ -43,8 +44,15 @@ export async function PlayerDashboard({ ctx }: { ctx: AppContext }) {
         }}
       >
         <div>
-          <div style={{ fontSize: 11, color: "var(--fg-2)" }} data-mono>
-            {club.club_name}
+          <div style={{ fontSize: 11, color: "var(--fg-2)" }}>
+            <ClubSwitcher
+              clubs={ctx.clubs.map((c) => ({
+                club_id: c.club_id,
+                club_name: c.club_name,
+                role: c.role,
+              }))}
+              activeClubId={club.club_id}
+            />
           </div>
           <div style={{ fontSize: 12, color: "var(--fg-2)", marginTop: 2 }}>
             {ctx.user.display_name}

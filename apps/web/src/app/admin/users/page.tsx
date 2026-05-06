@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { db } from "@/lib/db";
 import { CreateUserForm } from "./create-form";
 
@@ -118,6 +119,13 @@ export default async function AdminUsersPage() {
                   ) : null}
                 </div>
               </div>
+              <Link
+                href={`/admin/users/${u.id}`}
+                className="pkr-btn pkr-btn--ghost pkr-btn--sm"
+                style={{ height: 32 }}
+              >
+                Edit
+              </Link>
             </div>
           );
         })}

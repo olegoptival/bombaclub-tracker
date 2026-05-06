@@ -2,9 +2,11 @@
 
 import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
-import { redirect } from "next/navigation";
 
-export type LoginState = { error?: string };
+export type LoginState = {
+  error?: string;
+  redirectTo?: string;
+};
 
 export async function loginAction(
   _prev: LoginState,
@@ -26,12 +28,12 @@ export async function loginAction(
     });
   } catch (err) {
     if (err instanceof AuthError) {
-      // Don't leak whether it was a wrong login or wrong password
       return { error: "Login failed. Check your credentials and try again." };
     }
     throw err;
   }
 
-  // Successful — middleware will route us further (e.g. to /first-login if needed)
-  redirect(from && from.startsWith("/") ? from : "/");
+  // Don't redirect from the action — let the client navigate, that lets
+  // the browser commit the session cookie before middleware sees it.
+  return { redirectTo: from && from.startsWith("/") ? from : "/" };
 }

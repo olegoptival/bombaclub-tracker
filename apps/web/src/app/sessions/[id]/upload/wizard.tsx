@@ -158,7 +158,30 @@ export function UploadWizard({
     if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
   };
 
-  const allReady =
+  const deleteServerItem = async (importId: string) => {
+    if (!confirm("Delete this screenshot?")) return;
+    try {
+      const res = await fetch(
+        `/api/sessions/${sessionId}/screenshots/${importId}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error ?? "Failed to delete");
+        return;
+      }
+      setServerItems((prev) => prev.filter((it) => it.id !== importId));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Network error";
+      alert(msg);
+    }
+  };
+
+  const removeLocalItem = (localId: string) => {
+    setLocalUploads((prev) => prev.filter((it) => it.localId !== localId));
+  };
+
+    const allReady =
     serverItems.length > 0 &&
     serverItems.every((i) => i.status === "parsed") &&
     localUploads.length === 0;
@@ -210,10 +233,10 @@ export function UploadWizard({
       {(serverItems.length > 0 || localUploads.length > 0) && (
         <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 8 }}>
           {serverItems.map((it) => (
-            <ServerItemRow key={it.id} item={it} />
+            <ServerItemRow key={it.id} item={it} onDelete={() => deleteServerItem(it.id)} />
           ))}
           {localUploads.map((it) => (
-            <LocalItemRow key={it.localId} item={it} />
+            <LocalItemRow key={it.localId} item={it} onRemove={() => removeLocalItem(it.localId)} />
           ))}
         </div>
       )}
@@ -237,7 +260,7 @@ export function UploadWizard({
   );
 }
 
-function ServerItemRow({ item }: { item: ImportItem }) {
+function ServerItemRow({ item, onDelete }: { item: ImportItem; onDelete: () => void }) {
   const label =
     item.status === "pending"
       ? "Queued"
@@ -309,11 +332,33 @@ function ServerItemRow({ item }: { item: ImportItem }) {
           </>
         )}
       </div>
+      <button
+        type="button"
+        onClick={onDelete}
+        title="Delete screenshot"
+        aria-label="Delete screenshot"
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 8,
+          background: "transparent",
+          border: "none",
+          color: "var(--fg-3)",
+          cursor: "pointer",
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 18,
+        }}
+      >
+        ×
+      </button>
     </div>
   );
 }
 
-function LocalItemRow({ item }: { item: LocalUpload }) {
+function LocalItemRow({ item, onRemove }: { item: LocalUpload; onRemove: () => void }) {
   const color = item.state === "failed" ? "var(--neg)" : "var(--fg-2)";
   return (
     <div className="pkr-card" style={{ padding: 12, display: "flex", alignItems: "center", gap: 12 }}>
@@ -351,6 +396,30 @@ function LocalItemRow({ item }: { item: LocalUpload }) {
           {item.error && <span> · {item.error}</span>}
         </div>
       </div>
+      {item.state === "failed" && (
+        <button
+          type="button"
+          onClick={onRemove}
+          title="Remove"
+          aria-label="Remove"
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 8,
+            background: "transparent",
+            border: "none",
+            color: "var(--fg-3)",
+            cursor: "pointer",
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 18,
+          }}
+        >
+          ×
+        </button>
+      )}
     </div>
   );
 }
