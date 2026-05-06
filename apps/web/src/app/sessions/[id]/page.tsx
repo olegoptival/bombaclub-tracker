@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Prisma } from "@prisma/client";
 import { getAppContext } from "@/lib/session/context";
 import { db } from "@/lib/db";
+import { computeSessionTransfers } from "@/lib/settle/session-transfers";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Session · Bombaclub Tracker" };
@@ -80,6 +81,15 @@ export default async function SessionDetailPage({
     };
   });
   rows.sort((a, b) => parseFloat(b.pnl.toString()) - parseFloat(a.pnl.toString()));
+
+  const transfers = computeSessionTransfers(
+    rows.map((r) => ({
+      participant_id: r.id,
+      display_name: r.name,
+      is_guest: r.is_guest,
+      profit_loss: r.pnl,
+    }))
+  );
 
   const sumPnL = rows.reduce(
     (acc, r) => acc.add(r.pnl),
@@ -237,6 +247,56 @@ export default async function SessionDetailPage({
             <span data-mono>{parseFloat(sumPnL.toString()).toFixed(2)}</span>
           </div>
         </div>
+
+        {transfers.length > 0 && session.status === "ended" && (
+          <div className="pkr-card" style={{ padding: 14, marginBottom: 14 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 8,
+              }}
+            >
+              <div className="pkr-section-label">
+                Settle-up &middot; {transfers.length} transfer{transfers.length !== 1 ? "s" : ""}
+              </div>
+              <a
+                href={`/api/sessions/${id}/og`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="pkr-btn pkr-btn--ghost pkr-btn--sm"
+                style={{ height: 28 }}
+              >
+                Share image
+              </a>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              {transfers.map((t, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "10px 0",
+                    borderTop: i === 0 ? "none" : "0.5px solid var(--line)",
+                    fontSize: 14,
+                  }}
+                >
+                  <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ color: "var(--fg-2)" }}>{t.from_player_name}</span>
+                    <span style={{ color: "var(--fg-3)" }}>{"→"}</span>
+                    <span style={{ fontWeight: 500 }}>{t.to_player_name}</span>
+                  </span>
+                  <span data-mono style={{ fontWeight: 600 }}>
+                    {parseFloat(t.amount.toString()).toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {session.type === "online" && session.ocr_imports.length > 0 && (
           <div className="pkr-card" style={{ padding: 14 }}>
