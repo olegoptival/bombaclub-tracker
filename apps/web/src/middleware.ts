@@ -6,10 +6,18 @@ const { auth } = NextAuth(authConfig);
 
 const PUBLIC_PATHS = ["/login", "/api/auth"];
 
+// Match /api/sessions/<uuid>/og  — public so the share image is reachable
+// without auth (the UUID itself is the capability).
+const PUBLIC_REGEX = [/^\/api\/sessions\/[0-9a-f-]+\/og$/i];
+
 export default auth((req) => {
   const { nextUrl } = req;
   const isAuthed = !!req.auth?.user;
   const path = nextUrl.pathname;
+
+  if (PUBLIC_REGEX.some((re) => re.test(path))) {
+    return NextResponse.next();
+  }
 
   if (PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + "/"))) {
     if (isAuthed && path === "/login") {
