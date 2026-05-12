@@ -5,15 +5,69 @@ import type { AppContext } from "@/lib/session/context";
 import { MoneyDisplay } from "@/components/money-display";
 import { ClubSwitcher } from "@/components/club-switcher";
 
-export async function PlayerDashboard({ ctx }: { ctx: AppContext }) {
-  const club = ctx.activeClub!;
-  const balance = parseFloat(club.current_balance);
+type Period = "week" | "month" | "all";
 
-  // Last 3 sessions where this user participated
+function resolvePeriod(value: string | string[] | undefined): Period {
+  const v = Array.isArray(value) ? value[0] : value;
+  return v === "week" || v === "month" ? v : "all";
+}
+
+function cutoffFor(period: Period): Date | null {
+  if (period === "all") return null;
+  const days = period === "week" ? 7 : 30;
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - days);
+  return d;
+}
+
+const PERIOD_LABELS: Record<Period, string> = {
+  week: "Week",
+  month: "Month",
+  all: "All time",
+};
+
+export async function PlayerDashboard({
+  ctx,
+  searchParams,
+}: {
+  ctx: AppContext;
+  searchParams?: { period?: string | string[] };
+}) {
+  const club = ctx.activeClub!;
+  const period = resolvePeriod(searchParams?.period);
+  const cutoff = cutoffFor(period);
+
+  // Hero balance:
+  //   - all time → use the materialized current_balance on club_members
+  //   - week/month → sum profit_loss across session_results within the window
+  let balance: number;
+  if (period === "all") {
+    balance = parseFloat(club.current_balance);
+  } else {
+    const rows = await db.session_results.findMany({
+      where: {
+        session_participants: { club_member_id: club.member_id },
+        sessions: {
+          status: "ended",
+          ended_at: { gte: cutoff! },
+        },
+      },
+      select: { profit_loss: true },
+    });
+    balance = rows.reduce((acc, r) => acc + parseFloat(r.profit_loss.toString()), 0);
+  }
+
+  // Last 5 sessions, filtered by the same period as the hero balance
   const recentParticipations = await db.session_participants.findMany({
-    where: { club_member_id: club.member_id },
+    where: {
+      club_member_id: club.member_id,
+      sessions: {
+        status: "ended",
+        ...(cutoff ? { ended_at: { gte: cutoff } } : {}),
+      },
+    },
     orderBy: { sessions: { ended_at: "desc" } },
-    take: 3,
+    take: 5,
     include: {
       sessions: {
         select: {
@@ -93,10 +147,52 @@ export async function PlayerDashboard({ ctx }: { ctx: AppContext }) {
       </header>
 
       <div style={{ maxWidth: 460, marginInline: "auto" }}>
+        {/* Period switcher */}
+        <div
+          role="tablist"
+          aria-label="Statistics period"
+          style={{
+            display: "flex",
+            gap: 4,
+            padding: 4,
+            background: "var(--bg-2)",
+            borderRadius: 10,
+            marginBottom: 10,
+          }}
+        >
+          {(["week", "month", "all"] as Period[]).map((p) => {
+            const active = p === period;
+            return (
+              <Link
+                key={p}
+                href={p === "all" ? "/" : `/?period=${p}`}
+                role="tab"
+                aria-selected={active}
+                scroll={false}
+                style={{
+                  flex: 1,
+                  textAlign: "center",
+                  padding: "8px 0",
+                  fontSize: 12.5,
+                  fontWeight: 500,
+                  borderRadius: 7,
+                  textDecoration: "none",
+                  color: active ? "var(--fg-1)" : "var(--fg-2)",
+                  background: active ? "var(--bg-1)" : "transparent",
+                  boxShadow: active ? "var(--shadow-sm)" : "none",
+                  transition: "background 120ms, color 120ms",
+                }}
+              >
+                {PERIOD_LABELS[p]}
+              </Link>
+            );
+          })}
+        </div>
+
         {/* Balance hero */}
         <div className="pkr-card" style={{ padding: 22, marginBottom: 14 }}>
           <div className="pkr-section-label" style={{ marginBottom: 8 }}>
-            Balance · all time
+            Balance · {PERIOD_LABELS[period].toLowerCase()}
           </div>
           <MoneyDisplay value={balance} size="hero" />
         </div>
@@ -119,13 +215,12 @@ export async function PlayerDashboard({ ctx }: { ctx: AppContext }) {
                 fontSize: 13,
               }}
             >
-              No sessions yet.
+              No sessions in this period.
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {recentParticipations.map((p) => {
                 const s = p.sessions;
-                // session_results is an array (1-to-many in schema, in practice 0 or 1)
                 const result = p.session_results[0];
                 const net = result
                   ? parseFloat(result.profit_loss.toString())

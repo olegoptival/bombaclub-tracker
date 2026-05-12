@@ -6,12 +6,17 @@ import { PlayerDashboard } from "./_player/dashboard";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string | string[] }>;
+}) {
+  const sp = await searchParams;
   const ctx = await getAppContext();
 
   // Branch 1: user has at least one active club membership
   if (ctx.activeClub) {
-    return <PlayerDashboard ctx={ctx} />;
+    return <PlayerDashboard ctx={ctx} searchParams={sp} />;
   }
 
   // Branch 2: super-admin without any club membership — show system stats
