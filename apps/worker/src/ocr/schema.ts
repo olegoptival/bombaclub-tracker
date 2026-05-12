@@ -30,7 +30,7 @@ export const ocrPlayerSchema = z.object({
   name: z.string(),
   id: z.string().regex(playerIdRegex).nullable(),
   profit_loss: z.number(),
-  fee: z.number(),
+  fee: z.number().nullable().optional().transform((v) => v ?? 0),
 });
 
 export const ocrValidationSchema = z.object({
