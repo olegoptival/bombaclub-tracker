@@ -2,10 +2,11 @@ import Link from "next/link";
 import { logoutAction } from "@/lib/actions/logout";
 import { db } from "@/lib/db";
 import type { AppContext } from "@/lib/session/context";
-import { MoneyDisplay } from "@/components/money-display";
 import { ClubSwitcher } from "@/components/club-switcher";
-
-type Period = "week" | "month" | "all";
+import type { AreaChartPoint } from "@/components/ui/area-chart";
+import type { Period } from "@/components/ui/period-picker";
+import { BalanceCard, type LastSessionInfo } from "./balance-card";
+import { RecentSessions, type RecentSession } from "./recent-sessions";
 
 function resolvePeriod(value: string | string[] | undefined): Period {
   const v = Array.isArray(value) ? value[0] : value;
@@ -20,11 +21,22 @@ function cutoffFor(period: Period): Date | null {
   return d;
 }
 
-const PERIOD_LABELS: Record<Period, string> = {
-  week: "Week",
-  month: "Month",
-  all: "All time",
-};
+function chartTickLabel(d: Date): string {
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function tooltipDateLabel(d: Date): string {
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function sessionTitle(s: { title: string | null; type: string }): string {
+  if (s.title) return s.title;
+  return s.type === "online" ? "Online session" : "Live session";
+}
 
 export async function PlayerDashboard({
   ctx,
@@ -37,28 +49,8 @@ export async function PlayerDashboard({
   const period = resolvePeriod(searchParams?.period);
   const cutoff = cutoffFor(period);
 
-  // Hero balance:
-  //   - all time → use the materialized current_balance on club_members
-  //   - week/month → sum profit_loss across session_results within the window
-  let balance: number;
-  if (period === "all") {
-    balance = parseFloat(club.current_balance);
-  } else {
-    const rows = await db.session_results.findMany({
-      where: {
-        session_participants: { club_member_id: club.member_id },
-        sessions: {
-          status: "ended",
-          ended_at: { gte: cutoff! },
-        },
-      },
-      select: { profit_loss: true },
-    });
-    balance = rows.reduce((acc, r) => acc + parseFloat(r.profit_loss.toString()), 0);
-  }
-
-  // Last 5 sessions, filtered by the same period as the hero balance
-  const recentParticipations = await db.session_participants.findMany({
+  // All sessions in period (asc) — feeds the chart, the counter and the balance.
+  const participationsAsc = await db.session_participants.findMany({
     where: {
       club_member_id: club.member_id,
       sessions: {
@@ -66,24 +58,72 @@ export async function PlayerDashboard({
         ...(cutoff ? { ended_at: { gte: cutoff } } : {}),
       },
     },
-    orderBy: { sessions: { ended_at: "desc" } },
-    take: 5,
+    orderBy: { sessions: { ended_at: "asc" } },
     include: {
       sessions: {
         select: {
           id: true,
           title: true,
           type: true,
-          status: true,
           started_at: true,
           ended_at: true,
         },
       },
-      session_results: {
-        select: { profit_loss: true },
-      },
+      session_results: { select: { profit_loss: true } },
     },
   });
+
+  const sessionsCount = participationsAsc.length;
+  const periodPnl = participationsAsc.reduce((acc, p) => {
+    const r = p.session_results[0];
+    return acc + (r ? Number(r.profit_loss) : 0);
+  }, 0);
+  const balance = period === "all" ? Number(club.current_balance) : periodPnl;
+
+  // Chart series — cumulative PnL with rich metadata for tooltips.
+  const chartData: AreaChartPoint[] = [];
+  let cum = 0;
+  for (const p of participationsAsc) {
+    const r = p.session_results[0];
+    const pnl = r ? Number(r.profit_loss) : 0;
+    cum += pnl;
+    const d = new Date(p.sessions.ended_at ?? p.sessions.started_at ?? Date.now());
+    chartData.push({
+      x: chartTickLabel(d),
+      value: cum,
+      meta: { dateLabel: tooltipDateLabel(d), pnl },
+    });
+  }
+
+  // Last session in period — feeds the callout.
+  const last = participationsAsc[participationsAsc.length - 1];
+  const lastSession: LastSessionInfo | null = last
+    ? {
+        type: last.sessions.type,
+        title: sessionTitle(last.sessions),
+        date: last.sessions.ended_at ? new Date(last.sessions.ended_at) : null,
+        pnl: last.session_results[0]
+          ? Number(last.session_results[0].profit_loss)
+          : null,
+      }
+    : null;
+
+  // Recent 3 — newest first, same period filter.
+  const recent: RecentSession[] = [...participationsAsc]
+    .reverse()
+    .slice(0, 3)
+    .map((p) => ({
+      id: p.sessions.id,
+      participantId: p.id,
+      title: sessionTitle(p.sessions),
+      type: p.sessions.type,
+      date: p.sessions.ended_at
+        ? new Date(p.sessions.ended_at)
+        : p.sessions.started_at
+          ? new Date(p.sessions.started_at)
+          : null,
+      net: p.session_results[0] ? Number(p.session_results[0].profit_loss) : null,
+    }));
 
   return (
     <main style={{ minHeight: "100vh", padding: "20px 16px 80px" }}>
@@ -147,134 +187,15 @@ export async function PlayerDashboard({
       </header>
 
       <div style={{ maxWidth: 460, marginInline: "auto" }}>
-        {/* Period switcher */}
-        <div
-          role="tablist"
-          aria-label="Statistics period"
-          style={{
-            display: "flex",
-            gap: 4,
-            padding: 4,
-            background: "var(--bg-2)",
-            borderRadius: 10,
-            marginBottom: 10,
-          }}
-        >
-          {(["week", "month", "all"] as Period[]).map((p) => {
-            const active = p === period;
-            return (
-              <Link
-                key={p}
-                href={p === "all" ? "/" : `/?period=${p}`}
-                role="tab"
-                aria-selected={active}
-                scroll={false}
-                style={{
-                  flex: 1,
-                  textAlign: "center",
-                  padding: "8px 0",
-                  fontSize: 12.5,
-                  fontWeight: 500,
-                  borderRadius: 7,
-                  textDecoration: "none",
-                  color: active ? "var(--fg-1)" : "var(--fg-2)",
-                  background: active ? "var(--bg-1)" : "transparent",
-                  boxShadow: active ? "var(--shadow-sm)" : "none",
-                  transition: "background 120ms, color 120ms",
-                }}
-              >
-                {PERIOD_LABELS[p]}
-              </Link>
-            );
-          })}
-        </div>
+        <BalanceCard
+          balance={balance}
+          period={period}
+          sessionsCount={sessionsCount}
+          chartData={chartData}
+          lastSession={lastSession}
+        />
 
-        {/* Balance hero */}
-        <div className="pkr-card" style={{ padding: 22, marginBottom: 14 }}>
-          <div className="pkr-section-label" style={{ marginBottom: 8 }}>
-            Balance · {PERIOD_LABELS[period].toLowerCase()}
-          </div>
-          <MoneyDisplay value={balance} size="hero" />
-        </div>
-
-        {/* Recent sessions */}
-        <div style={{ marginTop: 18 }}>
-          <div
-            className="pkr-section-label"
-            style={{ marginBottom: 10, paddingInline: 4 }}
-          >
-            Last sessions
-          </div>
-          {recentParticipations.length === 0 ? (
-            <div
-              className="pkr-card"
-              style={{
-                padding: 28,
-                textAlign: "center",
-                color: "var(--fg-2)",
-                fontSize: 13,
-              }}
-            >
-              No sessions in this period.
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {recentParticipations.map((p) => {
-                const s = p.sessions;
-                const result = p.session_results[0];
-                const net = result
-                  ? parseFloat(result.profit_loss.toString())
-                  : null;
-                const date = s.ended_at ?? s.started_at;
-                return (
-                  <Link
-                    key={p.id}
-                    href={`/sessions/${s.id}`}
-                    className="pkr-card"
-                    style={{
-                      padding: 14,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      textDecoration: "none",
-                      color: "inherit",
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 500 }}>
-                        {s.title ?? `${s.type === "online" ? "Online" : "Offline"} session`}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 11.5,
-                          color: "var(--fg-2)",
-                          marginTop: 2,
-                          display: "flex",
-                          gap: 8,
-                        }}
-                      >
-                        <span>{s.type === "online" ? "Online" : "Offline"}</span>
-                        <span>•</span>
-                        <span data-mono>
-                          {date ? new Date(date).toLocaleDateString() : "—"}
-                        </span>
-                        {s.status !== "ended" && (
-                          <>
-                            <span>•</span>
-                            <span style={{ color: "var(--status-warning)" }}>
-                              {s.status}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    {net !== null && <MoneyDisplay value={net} size="md" />}
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        <RecentSessions items={recent} />
 
         {club.role === "host" && (
           <div

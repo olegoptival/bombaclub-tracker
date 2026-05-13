@@ -4,27 +4,26 @@ export function SessionTypeIcon({
   type,
   size = 14,
 }: {
-  type: "online" | "offline";
+  type: "online" | "offline" | string | null | undefined;
   size?: number;
 }) {
   const isOnline = type === "online";
-
+  const accent = isOnline ? "var(--accent, #d4a747)" : "var(--accent-2, #c79a3a)";
   return (
     <span
-      title={isOnline ? "Online" : "Live"}
       style={{
+        width: size + 14,
+        height: size + 14,
+        borderRadius: 8,
+        background: "var(--bg-2)",
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        width: size + 8,
-        height: size + 8,
-        borderRadius: 6,
+        color: accent,
         flexShrink: 0,
-        background: isOnline ? "var(--felt-soft)" : "var(--accent-soft)",
-        color: isOnline ? "var(--felt)" : "var(--accent)",
       }}
     >
-      <Icon name={isOnline ? "monitor" : "users"} size={size - 2} strokeWidth={2} />
+      <Icon name={isOnline ? "monitor" : "users"} size={size} />
     </span>
   );
 }
