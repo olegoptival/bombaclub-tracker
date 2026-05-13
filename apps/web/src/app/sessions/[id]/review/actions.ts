@@ -69,9 +69,21 @@ export async function finalizeSessionAction(
     };
   }
 
+  // Derive session timeframe from OCR snapshot periods (the time the game
+  // actually happened, not when the host pressed Finalize).
+  const periodAgg = await db.ocr_imports.aggregate({
+    where: { session_id: sessionId },
+    _min: { snapshot_period_start: true },
+    _max: { snapshot_period_end: true },
+  });
+  const periodStart = periodAgg._min.snapshot_period_start;
+  const periodEnd = periodAgg._max.snapshot_period_end;
+
   // Transaction: write session_results, ledger_entries, update balances, end session
   await db.$transaction(async (tx) => {
     const now = new Date();
+    const startedAt = periodStart ?? now;
+    const endedAt = periodEnd ?? now;
 
     for (const a of aggregates) {
       // session_results — for every participant (member or guest)
@@ -121,7 +133,7 @@ export async function finalizeSessionAction(
 
     await tx.sessions.update({
       where: { id: sessionId },
-      data: { status: "ended", ended_at: now, started_at: now },
+      data: { status: "ended", started_at: startedAt, ended_at: endedAt },
     });
   });
 
