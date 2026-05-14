@@ -6,21 +6,38 @@ import { Icon, type IconName } from "./icon";
 
 type Tab = { id: string; href: string; icon: IconName; label: string };
 
-const TABS: Tab[] = [
-  { id: "home",     href: "/",          icon: "home",  label: "Home"      },
-  { id: "sessions", href: "/sessions",  icon: "list",  label: "Sessions"  },
-  { id: "settle",   href: "/settle-up", icon: "scale", label: "Settle-up" },
-  { id: "members",  href: "/members",   icon: "users", label: "Members"   },
-  { id: "profile",  href: "/profile",   icon: "user",  label: "Profile"   },
+const BASE: Tab[] = [
+  { id: "home", href: "/", icon: "home", label: "Home" },
+  { id: "sessions", href: "/sessions", icon: "list", label: "Sessions" },
+  { id: "week", href: "/week", icon: "trend", label: "Week" },
 ];
+
+const CLUB: Tab = { id: "club", href: "/club/settings", icon: "scale", label: "Club" };
+const PROFILE: Tab = { id: "profile", href: "/profile", icon: "user", label: "Profile" };
+const ADMIN: Tab = { id: "admin", href: "/admin", icon: "zap", label: "Admin" };
 
 function isActive(pathname: string, tab: Tab): boolean {
   if (tab.href === "/") return pathname === "/";
-  return pathname.startsWith(tab.href);
+  return pathname === tab.href || pathname.startsWith(`${tab.href}/`);
 }
 
-export function BottomNav() {
+export function BottomNav({
+  role,
+  isSuperuser,
+}: {
+  role: "host" | "player";
+  isSuperuser: boolean;
+}) {
   const pathname = usePathname();
+
+  const tabs: Tab[] = [...BASE];
+  if (isSuperuser) {
+    tabs.push(CLUB, ADMIN);
+  } else if (role === "host") {
+    tabs.push(CLUB, PROFILE);
+  } else {
+    tabs.push(PROFILE);
+  }
 
   return (
     <nav
@@ -40,7 +57,7 @@ export function BottomNav() {
       }}
       className="pkr-bottom-nav"
     >
-      {TABS.map((tab) => {
+      {tabs.map((tab) => {
         const on = isActive(pathname, tab);
         return (
           <Link
