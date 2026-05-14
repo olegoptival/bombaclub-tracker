@@ -8,7 +8,10 @@ const PUBLIC_PATHS = ["/login", "/api/auth"];
 
 // Match /api/sessions/<uuid>/og  — public so the share image is reachable
 // without auth (the UUID itself is the capability).
-const PUBLIC_REGEX = [/^\/api\/sessions\/[0-9a-f-]+\/og$/i];
+const PUBLIC_REGEX = [
+  /^\/api\/sessions\/[0-9a-f-]+\/og$/i,
+  /^\/api\/weeks\/[0-9a-f-]+\/\d{4}-W\d{2}\/og$/i,
+];
 
 export default auth((req) => {
   const { nextUrl } = req;

@@ -7,6 +7,9 @@ import type { AreaChartPoint } from "@/components/ui/area-chart";
 import type { Period } from "@/components/ui/period-picker";
 import { BalanceCard, type LastSessionInfo } from "./balance-card";
 import { RecentSessions, type RecentSession } from "./recent-sessions";
+import { Prisma } from "@prisma/client";
+import { WeekCard } from "./week-card";
+import { currentIsoWeek, weekRangeUtc } from "@/app/week/week-utils";
 
 function resolvePeriod(value: string | string[] | undefined): Period {
   const v = Array.isArray(value) ? value[0] : value;
@@ -125,6 +128,28 @@ export async function PlayerDashboard({
       net: p.session_results[0] ? Number(p.session_results[0].profit_loss) : null,
     }));
 
+  // ─── This week (online only) ────────────────────────────────────────
+  const { start: weekStart, end: weekEnd } = weekRangeUtc(currentIsoWeek());
+  const weekParticipations = await db.session_participants.findMany({
+    where: {
+      club_member_id: club.member_id,
+      sessions: {
+        type: "online",
+        status: "ended",
+        started_at: { gte: weekStart, lt: weekEnd },
+      },
+    },
+    include: { session_results: { select: { profit_loss: true } } },
+  });
+  let weekPnl = new Prisma.Decimal(0);
+  let weekCount = 0;
+  for (const wp of weekParticipations) {
+    const r = wp.session_results[0];
+    if (!r) continue;
+    weekPnl = weekPnl.add(r.profit_loss);
+    weekCount += 1;
+  }
+
   return (
     <main style={{ minHeight: "100vh", padding: "20px 16px 80px" }}>
       <header
@@ -175,6 +200,11 @@ export async function PlayerDashboard({
               Admin
             </Link>
           )}
+          {(club.role === "host" || ctx.user.isSuperuser) && (
+            <Link href="/club/settings" className="pkr-btn pkr-btn--ghost pkr-btn--sm">
+              Club
+            </Link>
+          )}
           <Link href="/profile" className="pkr-btn pkr-btn--ghost pkr-btn--sm">
             Profile
           </Link>
@@ -194,6 +224,8 @@ export async function PlayerDashboard({
           chartData={chartData}
           lastSession={lastSession}
         />
+
+        <WeekCard totalPnl={weekPnl} sessionsCount={weekCount} />
 
         <RecentSessions items={recent} />
 

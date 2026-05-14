@@ -156,7 +156,11 @@ function MembershipRow({
         </div>
       </div>
 
-      <form action={action} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <form
+        key={`${membership.id}:${membership.role}:${membership.status}:${membership.nickname}`}
+        action={action}
+        style={{ display: "flex", flexDirection: "column", gap: 8 }}
+      >
         <input type="hidden" name="membership_id" value={membership.id} />
         <input type="hidden" name="user_id" value={userId} />
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
