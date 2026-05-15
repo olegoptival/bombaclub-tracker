@@ -194,7 +194,7 @@ export async function PlayerDashboard({
             )}
           </div>
         </div>
-        <div style={{ display: "flex", gap: 6 }}>
+        <div className="pkr-desktop-hide" style={{ display: "flex", gap: 6 }}>
           {ctx.user.isSuperuser && (
             <Link href="/admin" className="pkr-btn pkr-btn--ghost pkr-btn--sm">
               Admin
@@ -231,13 +231,15 @@ export async function PlayerDashboard({
 
         {club.role === "host" && (
           <div
+            className="pkr-desktop-hide"
             style={{
               position: "fixed",
-              bottom: 20,
+              bottom: 76,
               left: 16,
               right: 16,
               maxWidth: 460,
               marginInline: "auto",
+              zIndex: 40,
             }}
           >
             <Link

@@ -1,10 +1,6 @@
 @import "tailwindcss";
 
-@media (min-width: 640px) {
-  .pkr-bottom-nav {
-    display: none;
-  }
-}
+/* breakpoint moved to tokens.css (.pkr-app-shell rules) */
 
 @keyframes scan {
   0%   { top: 5%;  opacity: 0.3; }

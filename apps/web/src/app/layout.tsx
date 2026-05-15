@@ -24,18 +24,34 @@ export const metadata: Metadata = {
 async function resolveChrome(): Promise<{
   role: "host" | "player" | null;
   isSuperuser: boolean;
+  clubName: string | null;
+  displayName: string;
 }> {
   const session = await auth();
-  if (!session?.user) return { role: null, isSuperuser: false };
+  if (!session?.user) {
+    return { role: null, isSuperuser: false, clubName: null, displayName: "" };
+  }
   const isSuperuser = !!session.user.isSuperuser;
-  // Pick any active membership to decide host vs player tab set.
+
+  // Pick membership: prefer host, then active.
   const m = await db.club_members.findFirst({
     where: { user_id: session.user.id, status: "active" },
-    select: { role: true },
-    orderBy: { role: "desc" }, // host before player
+    select: { role: true, clubs: { select: { name: true } } },
+    orderBy: { role: "desc" },
   });
   const role = m ? (m.role as "host" | "player") : "player";
-  return { role, isSuperuser };
+
+  const user = await db.users.findUnique({
+    where: { id: session.user.id },
+    select: { display_name: true },
+  });
+
+  return {
+    role,
+    isSuperuser,
+    clubName: m?.clubs.name ?? null,
+    displayName: user?.display_name ?? "",
+  };
 }
 
 export default async function RootLayout({
@@ -47,8 +63,13 @@ export default async function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>
-        {children}
-        <AppChrome role={chrome.role} isSuperuser={chrome.isSuperuser} />
+        <AppChrome
+          role={chrome.role}
+          isSuperuser={chrome.isSuperuser}
+          clubName={chrome.clubName}
+          displayName={chrome.displayName}
+        />
+        <div className="pkr-app-shell">{children}</div>
       </body>
     </html>
   );

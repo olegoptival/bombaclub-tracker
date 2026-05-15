@@ -249,3 +249,28 @@ button { font-family: inherit; }
   border-radius: 999px;
 }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* ─────────────────────────────────────────────────────────────
+   App shell — adaptive: mobile bottom-nav, desktop sidebar
+   ───────────────────────────────────────────────────────────── */
+
+.pkr-app-shell {
+  min-height: 100vh;
+  padding-bottom: 64px; /* mobile bottom-nav */
+}
+
+.pkr-sidebar { display: none; }
+
+@media (min-width: 768px) {
+  .pkr-bottom-nav { display: none !important; }
+  .pkr-sidebar { display: flex !important; }
+  .pkr-app-shell {
+    padding-left: 220px;
+    padding-bottom: 0;
+  }
+  .pkr-desktop-hide { display: none !important; }
+}
+
+@media (max-width: 767.98px) {
+  .pkr-mobile-hide { display: none !important; }
+}
