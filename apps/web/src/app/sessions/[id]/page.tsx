@@ -82,6 +82,15 @@ export default async function SessionDetailPage({
   });
   rows.sort((a, b) => parseFloat(b.pnl.toString()) - parseFloat(a.pnl.toString()));
 
+  // Privacy: only host of this session or superuser sees everyone's numbers.
+  // Regular players see their own row in full, others blurred.
+  const isPrivilegedViewer =
+    ctx.user.isSuperuser || session.host_id === ctx.user.id;
+  const myMemberId = ctx.activeClub.member_id;
+  const myParticipantId = session.session_participants.find(
+    (sp) => sp.club_member_id === myMemberId
+  )?.id ?? null;
+
   const transfers = computeSessionTransfers(
     rows.map((r) => ({
       participant_id: r.id,
@@ -206,7 +215,17 @@ export default async function SessionDetailPage({
                         </span>
                       )}
                     </div>
-                    <span data-mono style={{ fontSize: 15, fontWeight: 600, color }}>
+                    <span
+                      data-mono
+                      style={{
+                        fontSize: 15,
+                        fontWeight: 600,
+                        color,
+                        ...(!isPrivilegedViewer && r.id !== myParticipantId
+                          ? { filter: "blur(6px)", userSelect: "none" }
+                          : {}),
+                      }}
+                    >
                       {num > 0 ? "+" : num < 0 ? "−" : ""}
                       {Math.abs(num).toFixed(2)}
                     </span>
@@ -221,10 +240,28 @@ export default async function SessionDetailPage({
                         gap: 10,
                       }}
                     >
-                      <span data-mono>{r.total_buy_in}</span>
+                      <span
+                        data-mono
+                        style={
+                          !isPrivilegedViewer && r.id !== myParticipantId
+                            ? { filter: "blur(5px)", userSelect: "none" }
+                            : undefined
+                        }
+                      >
+                        {r.total_buy_in}
+                      </span>
                       <span>in</span>
                       <span>·</span>
-                      <span data-mono>{r.total_cash_out}</span>
+                      <span
+                        data-mono
+                        style={
+                          !isPrivilegedViewer && r.id !== myParticipantId
+                            ? { filter: "blur(5px)", userSelect: "none" }
+                            : undefined
+                        }
+                      >
+                        {r.total_cash_out}
+                      </span>
                       <span>out</span>
                     </div>
                   )}
@@ -248,7 +285,18 @@ export default async function SessionDetailPage({
           </div>
         </div>
 
-        {transfers.length > 0 && session.status === "ended" && (
+        {transfers.length > 0 && session.status === "ended" && (() => {
+          const visibleTransfers = isPrivilegedViewer
+            ? transfers
+            : myParticipantId
+              ? transfers.filter(
+                  (t) =>
+                    t.from_player_id === myParticipantId ||
+                    t.to_player_id === myParticipantId
+                )
+              : [];
+          if (visibleTransfers.length === 0) return null;
+          return (
           <div className="pkr-card" style={{ padding: 14, marginBottom: 14 }}>
             <div
               style={{
@@ -259,8 +307,11 @@ export default async function SessionDetailPage({
               }}
             >
               <div className="pkr-section-label">
-                Settle-up &middot; {transfers.length} transfer{transfers.length !== 1 ? "s" : ""}
+                {isPrivilegedViewer
+                  ? `Settle-up · ${visibleTransfers.length} transfer${visibleTransfers.length !== 1 ? "s" : ""}`
+                  : "Your transfers"}
               </div>
+              {isPrivilegedViewer && (
               <a
                 href={`/api/sessions/${id}/og`}
                 target="_blank"
@@ -270,9 +321,10 @@ export default async function SessionDetailPage({
               >
                 Share image
               </a>
+              )}
             </div>
             <div style={{ display: "flex", flexDirection: "column" }}>
-              {transfers.map((t, i) => (
+              {visibleTransfers.map((t, i) => (
                 <div
                   key={i}
                   style={{
@@ -296,7 +348,8 @@ export default async function SessionDetailPage({
               ))}
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {session.type === "online" && session.ocr_imports.length > 0 && (
           <div className="pkr-card" style={{ padding: 14 }}>

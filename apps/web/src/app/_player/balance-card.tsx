@@ -9,9 +9,9 @@ import { LastSessionCallout } from "./last-session-callout";
 
 function periodCaption(period: Period): string {
   return period === "week"
-    ? "last 7 days"
+    ? "this week"
     : period === "month"
-      ? "last 30 days"
+      ? "this month"
       : "all time";
 }
 

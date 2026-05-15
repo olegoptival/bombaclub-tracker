@@ -46,7 +46,7 @@ export function WeekCard({ totalPnl, sessionsCount }: Props) {
           }}
         >
           <Icon name="trend" size={12} />
-          <span>This week</span>
+          <span>Weekly summary</span>
         </div>
         <div
           data-mono

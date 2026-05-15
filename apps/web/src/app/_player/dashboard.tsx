@@ -18,10 +18,13 @@ function resolvePeriod(value: string | string[] | undefined): Period {
 
 function cutoffFor(period: Period): Date | null {
   if (period === "all") return null;
-  const days = period === "week" ? 7 : 30;
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() - days);
-  return d;
+  if (period === "week") {
+    // Start of current ISO week (Monday 00:00 UTC) — matches /week page.
+    return weekRangeUtc(currentIsoWeek()).start;
+  }
+  // month: first day of current calendar month, 00:00 UTC.
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 }
 
 function chartTickLabel(d: Date): string {
